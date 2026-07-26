@@ -362,10 +362,10 @@ export default {
         interactive: true,
         pointToLayer: (feature, latlng) => {
           return L.circleMarker(latlng, {
-            radius: 7,
+            radius: 4,
             fillColor: '#800080',
             color: '#ffffff',
-            weight: 1,
+            weight: 1.5,
             opacity: 0.9,
             fillOpacity: 0.9
           });
@@ -398,10 +398,10 @@ export default {
         interactive: true,
         pointToLayer: (feature, latlng) => {
           return L.circleMarker(latlng, {
-            radius: 6,
+            radius: 3.5,
             fillColor: '#007bff',
             color: '#ffffff',
-            weight: 1,
+            weight: 1.5,
             opacity: 0.9,
             fillOpacity: 0.9
           });
