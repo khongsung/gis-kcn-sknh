@@ -621,7 +621,6 @@ export default {
 .webgis-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   height: 100dvh; /* Co giãn chuẩn theo thanh trình duyệt di động */
   width: 100vw;
   overflow: hidden;
