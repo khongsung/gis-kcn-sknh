@@ -22882,17 +22882,14 @@ __webpack_require__.r(__webpack_exports__);
     };
   },
   computed: {
-    // 🌟 Lấy đường dẫn URL hiện tại mượt mà từ Inertia $page
     currentPath: function currentPath() {
       var _this$$page;
       return ((_this$$page = this.$page) === null || _this$$page === void 0 ? void 0 : _this$$page.url) || window.location.pathname;
     },
-    // Lấy thông tin User đăng nhập từ Inertia Share props
     currentUser: function currentUser() {
       var _this$$page2;
       return ((_this$$page2 = this.$page) === null || _this$$page2 === void 0 || (_this$$page2 = _this$$page2.props) === null || _this$$page2 === void 0 || (_this$$page2 = _this$$page2.auth) === null || _this$$page2 === void 0 ? void 0 : _this$$page2.user) || null;
     },
-    // Kiểm tra quyền Admin
     isAdmin: function isAdmin() {
       return this.currentUser && this.currentUser.role === 'admin';
     }
@@ -22901,7 +22898,6 @@ __webpack_require__.r(__webpack_exports__);
     handleLogoError: function handleLogoError() {
       this.imageError = true;
     },
-    // 🌟 Hàm xử lý đăng xuất an toàn
     logout: function logout() {
       if (confirm('Anh có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
         this.$inertia.post('/logout');
@@ -25168,7 +25164,6 @@ var leafletLayers = {
       greeneryGeoJsonLayer: null,
       waterGeoJsonLayer: null,
       currentLocationMarker: null,
-      // Mảng lưu vết các nhãn Turf.js để ẩn/hiện khi zoom
       greeneryLabelMarkers: [],
       waterLabelMarkers: []
     };
@@ -25179,21 +25174,15 @@ var leafletLayers = {
   methods: {
     initMap: function initMap() {
       var _this = this;
-      // 1. KHỞI TẠO BẢN ĐỒ VỚI CANVAS RENDERER MẶC ĐỊNH DUY NHẤT
       this.map = leaflet__WEBPACK_IMPORTED_MODULE_0___default().map('map', {
         zoomControl: false,
         preferCanvas: true,
-        // Render mượt trên 1 Canvas chung
         wheelDebounceTime: 40,
         wheelPxPerZoomLevel: 80
       }).setView([21.246624, 106.178020], 16);
       leaflet__WEBPACK_IMPORTED_MODULE_0___default().control.zoom({
         position: 'bottomright'
       }).addTo(this.map);
-
-      // =========================================================================
-      // 🌟 KHỞI TẠO NỀN BẢN ĐỒ (BASEMAPS)
-      // =========================================================================
       var tileOptions = {
         maxZoom: 20,
         maxNativeZoom: 19,
@@ -25221,25 +25210,17 @@ var leafletLayers = {
         position: 'topright',
         collapsed: true
       }).addTo(this.map);
-
-      // 2. THÊM BẢNG CHÚ THÍCH CỐ ĐỊNH VÀO GÓC DƯỚI BÊN TRÁI
       this.addMapLegend();
-
-      // 3. LẮNG NGHE SỰ KIỆN ZOOM
       this.map.on('zoomend', function () {
         _this.checkAllLabelsVisibility();
       });
-
-      // 4. VẼ CÁC LỚP DỮ LIỆU THEO ĐÚNG THỨ TỰ TỪ DƯỚI LÊN TRÊN
-      // (Thứ tự vẽ quyết định đè hình trên Canvas, giúp bắt click chính xác 100%)
-      this.drawPlots(); // 1. Lô đất (Lớp nền đáy)
-      this.drawGreenery(); // 2. Cây xanh (Nằm trên đất)
-      this.drawWaterBodies(); // 3. Mặt nước (Nằm trên cây xanh/đất)
-      this.drawRoads(); // 4. Đường giao thông
-      this.drawFactories(); // 5. Nhà xưởng (Nằm trên lớp đất/xanh)
-      this.drawWastewater(); // 6. Hố ga nước thải (Lớp điểm đỉnh)
-      this.drawRainwater(); // 7. Hố ga nước mưa (Lớp điểm đỉnh)
-
+      this.drawPlots();
+      this.drawGreenery();
+      this.drawWaterBodies();
+      this.drawRoads();
+      this.drawFactories();
+      this.drawWastewater();
+      this.drawRainwater();
       this.bringManholesToFront();
       this.checkAllLabelsVisibility();
     },
@@ -25247,7 +25228,6 @@ var leafletLayers = {
       if (leafletLayers.wastewater) leafletLayers.wastewater.bringToFront();
       if (leafletLayers.rainwater) leafletLayers.rainwater.bringToFront();
     },
-    // 🗺️ 1. HÀM VẼ LÔ ĐẤT KCN
     drawPlots: function drawPlots() {
       if (!this.plotsData || !this.plotsData.features.length) return;
       leafletLayers.plots = leaflet__WEBPACK_IMPORTED_MODULE_0___default().geoJSON(this.plotsData, {
@@ -25289,7 +25269,6 @@ var leafletLayers = {
       }).addTo(this.map);
       this.plotsGeoJsonLayer = leafletLayers.plots;
     },
-    // 🌳 2. HÀM VẼ LỚP CÂY XANH / THẢM CỎ
     drawGreenery: function drawGreenery() {
       var _this2 = this;
       if (!this.greeneryData || !this.greeneryData.features) return;
@@ -25312,7 +25291,6 @@ var leafletLayers = {
       }).addTo(this.map);
       this.greeneryGeoJsonLayer = leafletLayers.greenery;
     },
-    // 🌊 3. HÀM VẼ LỚP MẶT NƯỚC / HỒ ĐIỀU HÒA
     drawWaterBodies: function drawWaterBodies() {
       var _this3 = this;
       if (!this.waterBodiesData || !this.waterBodiesData.features) return;
@@ -25335,7 +25313,6 @@ var leafletLayers = {
       }).addTo(this.map);
       this.waterGeoJsonLayer = leafletLayers.waterBodies;
     },
-    // 🛣️ 4. HÀM VẼ ĐƯỜNG GIAO THÔNG
     drawRoads: function drawRoads() {
       if (!this.roadsData || !this.roadsData.features.length) return;
       leafletLayers.roads = leaflet__WEBPACK_IMPORTED_MODULE_0___default().geoJSON(this.roadsData, {
@@ -25360,7 +25337,6 @@ var leafletLayers = {
       }).addTo(this.map);
       this.roadsGeoJsonLayer = leafletLayers.roads;
     },
-    // 🏭 5. HÀM VẼ LỚP NHÀ XƯỞNG
     drawFactories: function drawFactories() {
       var _this4 = this;
       if (!this.factoriesData || !this.factoriesData.features) return;
@@ -25368,8 +25344,6 @@ var leafletLayers = {
         interactive: true,
         style: function style(feature) {
           var p = feature.properties;
-
-          // Nếu xưởng đã cho thuê và công ty có màu riêng
           if (p.status === 'rented' && (p.company_color || p.color)) {
             var customColor = p.company_color || p.color;
             return {
@@ -25379,8 +25353,6 @@ var leafletLayers = {
               weight: 2
             };
           }
-
-          // Xưởng còn trống hoặc chưa chọn màu -> dùng màu trạng thái mặc định
           return _this4.getPolygonStyle(p.status, 0.6);
         },
         onEachFeature: function onEachFeature(feature, layer) {
@@ -25395,10 +25367,8 @@ var leafletLayers = {
               className: 'factory-label'
             });
           }
-
-          // Click chọn xưởng -> Mở Panel thông tin doanh nghiệp
           layer.on('click', function (e) {
-            leaflet__WEBPACK_IMPORTED_MODULE_0___default().DomEvent.stopPropagation(e); // Ngắt truyền sự kiện để mở đúng Panel xưởng
+            leaflet__WEBPACK_IMPORTED_MODULE_0___default().DomEvent.stopPropagation(e);
             _this4.selectedFactory = p;
           });
           layer.on({
@@ -25419,7 +25389,6 @@ var leafletLayers = {
       }).addTo(this.map);
       this.factoriesGeoJsonLayer = leafletLayers.factories;
     },
-    // 🧪 6. HÀM VẼ HỐ GA NƯỚC THẢI
     drawWastewater: function drawWastewater() {
       var _this5 = this;
       if (!this.wastewaterManholesData || !this.wastewaterManholesData.features) return;
@@ -25430,7 +25399,7 @@ var leafletLayers = {
             radius: 7,
             fillColor: '#800080',
             color: '#ffffff',
-            weight: 1.5,
+            weight: 1,
             opacity: 0.9,
             fillOpacity: 0.9
           });
@@ -25443,7 +25412,6 @@ var leafletLayers = {
         }
       }).addTo(this.map);
     },
-    // 🌧️ 7. HÀM VẼ HỐ GA NƯỚC MƯA
     drawRainwater: function drawRainwater() {
       var _this6 = this;
       if (!this.rainwaterManholesData || !this.rainwaterManholesData.features) return;
@@ -25454,7 +25422,7 @@ var leafletLayers = {
             radius: 6,
             fillColor: '#007bff',
             color: '#ffffff',
-            weight: 1.5,
+            weight: 1,
             opacity: 0.9,
             fillOpacity: 0.9
           });
@@ -25467,7 +25435,6 @@ var leafletLayers = {
         }
       }).addTo(this.map);
     },
-    // 📌 BẢNG CHÚ THÍCH CỐ ĐỊNH GÓC DƯỚI BÊN TRÁI
     addMapLegend: function addMapLegend() {
       var legend = leaflet__WEBPACK_IMPORTED_MODULE_0___default().control({
         position: 'bottomleft'
@@ -25481,12 +25448,9 @@ var leafletLayers = {
       };
       legend.addTo(this.map);
     },
-    // 🌟 HÀM TỔNG ẨN/HIỆN TẤT CẢ NHÃN KHI ZOOM
     checkAllLabelsVisibility: function checkAllLabelsVisibility() {
       if (!this.map) return;
       var currentZoom = this.map.getZoom();
-
-      // 1. Layer GeoJSON chuẩn
       var layersToCheck = [{
         layer: this.roadsGeoJsonLayer,
         minZoom: 16
@@ -25508,22 +25472,17 @@ var leafletLayers = {
       });
       var MIN_ZOOM = 16;
       var show = currentZoom >= MIN_ZOOM;
-
-      // 2. Nhãn Turf Cây xanh
       this.greeneryLabelMarkers.forEach(function (marker) {
         if (marker && marker.getTooltip()) {
           if (show) marker.openTooltip();else marker.closeTooltip();
         }
       });
-
-      // 3. Nhãn Turf Mặt nước
       this.waterLabelMarkers.forEach(function (marker) {
         if (marker && marker.getTooltip()) {
           if (show) marker.openTooltip();else marker.closeTooltip();
         }
       });
     },
-    // 🌟 CẬP NHẬT TRẠNG THÁI BẬT/TẮT & ĐỘ MỜ TỪ SIDEBAR CONTROL
     handleLayerChange: function handleLayerChange(_ref) {
       var name = _ref.name,
         config = _ref.config;
@@ -25584,7 +25543,6 @@ var leafletLayers = {
       if (status === 'available') return 'Đang trống / Cần đầu tư';
       return 'Đang xây dựng';
     },
-    // 🎯 ĐỊNH VỊ VỊ TRÍ GPS CỦA NGƯỜI DÙNG
     getCurrentLocation: function getCurrentLocation() {
       var _this7 = this;
       if (!navigator.geolocation) {
@@ -25626,15 +25584,12 @@ var leafletLayers = {
         enableHighAccuracy: true
       });
     },
-    // 🌟 HELPER METHOD: TÍNH TỌA ĐỘ TRỌNG TÂM LÒNG & GẮN NHÃN BẰNG TURF.JS
     addPolygonLabel: function addPolygonLabel(feature, labelText, cssClass) {
       if (!feature || !feature.geometry || !labelText) return null;
       try {
         var pt = (0,_turf_point_on_feature__WEBPACK_IMPORTED_MODULE_3__["default"])(feature);
         var lat = pt.geometry.coordinates[1];
         var lng = pt.geometry.coordinates[0];
-
-        // 🌟 interactive: false GIÚP NHÃN KHÔNG BỊ HÚT CLICK CỦA HÌNH ĐA GIÁC BÊN DƯỚI
         var labelMarker = leaflet__WEBPACK_IMPORTED_MODULE_0___default().circleMarker([lat, lng], {
           interactive: false,
           radius: 0,
@@ -25925,7 +25880,7 @@ function render(_ctx, _cache, $props, $setup, $data, $options) {
       }, "Trang chủ (Map)", -1 /* CACHED */)]));
     }),
     _: 1 /* STABLE */
-  }, 8 /* PROPS */, ["class"]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" <Link \r\n          href=\"/doanh-nghiep\" \r\n          class=\"nav-link\" \r\n          :class=\"{ active: currentPath.startsWith('/doanh-nghiep') }\"\r\n          @click=\"isMobileMenuOpen = false\"\r\n        >\r\n          <span class=\"nav-icon\">🏢</span>\r\n          <span class=\"nav-label\">Doanh nghiệp</span>\r\n        </Link>\r\n\r\n        <Link \r\n          href=\"/tuyen-dung\" \r\n          class=\"nav-link\" \r\n          :class=\"{ active: currentPath.startsWith('/tuyen-dung') }\"\r\n          @click=\"isMobileMenuOpen = false\"\r\n        >\r\n          <span class=\"nav-icon\">💼</span>\r\n          <span class=\"nav-label\">Tuyển dụng</span>\r\n        </Link> "), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createVNode)(_component_Link, {
+  }, 8 /* PROPS */, ["class"]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createVNode)(_component_Link, {
     href: "/contact",
     "class": (0,vue__WEBPACK_IMPORTED_MODULE_0__.normalizeClass)(["nav-link", {
       active: $options.currentPath.startsWith('/contact')
@@ -25942,7 +25897,7 @@ function render(_ctx, _cache, $props, $setup, $data, $options) {
       }, "Liên hệ Chủ đầu tư", -1 /* CACHED */)]));
     }),
     _: 1 /* STABLE */
-  }, 8 /* PROPS */, ["class"]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" MENU TRẠM XỬ LÝ (CHỈ ADMIN THẤY) "), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" <Link \r\n          v-if=\"isAdmin\" \r\n          href=\"/tram-xu-ly\" \r\n          class=\"nav-link admin-link\" \r\n          :class=\"{ active: currentPath.startsWith('/tram-xu-ly') }\"\r\n          @click=\"isMobileMenuOpen = false\"\r\n        >\r\n          <span class=\"nav-icon\">🧪</span>\r\n          <span class=\"nav-label\">Trạm xử lý nước thải</span>\r\n          <span class=\"badge-admin\">Admin</span>\r\n        </Link> ")]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" 3. KHUNG USER / ĐĂNG NHẬP (BÊN PHẢI CÙNG) "), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("div", _hoisted_8, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" ĐÃ ĐĂNG NHẬP: HIỆN AVATAR, TÊN VÀ NÚT DASHBOARD / LỐT ĐĂNG XUẤT "), $options.currentUser ? ((0,vue__WEBPACK_IMPORTED_MODULE_0__.openBlock)(), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementBlock)("div", _hoisted_9, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createVNode)(_component_Link, {
+  }, 8 /* PROPS */, ["class"])]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" 3. KHUNG USER / ĐĂNG NHẬP (BÊN PHẢI CÙNG) "), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("div", _hoisted_8, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" ĐÃ ĐĂNG NHẬP "), $options.currentUser ? ((0,vue__WEBPACK_IMPORTED_MODULE_0__.openBlock)(), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementBlock)("div", _hoisted_9, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createVNode)(_component_Link, {
     href: "/admin/dashboard",
     "class": "user-profile-link",
     title: "Truy cập Trang quản trị Admin"
@@ -25951,7 +25906,7 @@ function render(_ctx, _cache, $props, $setup, $data, $options) {
       return [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("div", _hoisted_10, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("div", _hoisted_11, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)($options.currentUser.name ? $options.currentUser.name.charAt(0).toUpperCase() : 'U'), 1 /* TEXT */), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("div", _hoisted_12, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("span", _hoisted_13, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)($options.currentUser.name), 1 /* TEXT */), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("span", _hoisted_14, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)($options.currentUser.role === 'admin' ? '👑 Quản trị viên' : '🏢 Doanh nghiệp'), 1 /* TEXT */)])])];
     }),
     _: 1 /* STABLE */
-  }), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)(" NÚT ĐĂNG XUẤT TÁCH BIỆT TRÁNH NHẦM SỰ KIỆN CLICK "), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("button", {
+  }), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("button", {
     onClick: _cache[5] || (_cache[5] = (0,vue__WEBPACK_IMPORTED_MODULE_0__.withModifiers)(function () {
       return $options.logout && $options.logout.apply($options, arguments);
     }, ["prevent"])),
@@ -29625,7 +29580,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(function(i){return i[1]});
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "\r\n/* THANH TOP HEADER NẰM NGANG FULL WIDTH */\n.top-navbar[data-v-65298cb8] {\r\n  width: 100vw;\r\n  height: 60px;\r\n  background: #0f172a;\r\n  color: #f8fafc;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: space-between;\r\n  padding: 0 20px;\r\n  box-sizing: border-box;\r\n  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);\r\n  z-index: 2000;\r\n  position: relative;\r\n  -webkit-user-select: none;\r\n     -moz-user-select: none;\r\n          user-select: none;\n}\n.nav-brand[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  flex-shrink: 0;\n}\n.brand-link[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 10px;\r\n  text-decoration: none;\n}\n.logo-box[data-v-65298cb8] {\r\n  width: 36px;\r\n  height: 36px;\r\n  background: #2563eb;\r\n  border-radius: 8px;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  font-weight: bold;\r\n  color: #fff;\r\n  overflow: hidden;\n}\n.logo-img[data-v-65298cb8] {\r\n  width: 100%;\r\n  height: 100%;\r\n  -o-object-fit: cover;\r\n     object-fit: cover;\n}\n.brand-title[data-v-65298cb8] {\r\n  font-size: 14px;\r\n  font-weight: 800;\r\n  margin: 0;\r\n  color: #38bdf8;\r\n  letter-spacing: 0.5px;\n}\n.brand-sub[data-v-65298cb8] {\r\n  font-size: 10px;\r\n  color: #94a3b8;\r\n  display: block;\n}\n.hamburger-btn[data-v-65298cb8], .nav-overlay[data-v-65298cb8] {\r\n  display: none;\n}\n.nav-content[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: space-between;\r\n  flex: 1;\r\n  margin-left: 24px;\n}\n.nav-menu[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nav-link[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 7px 12px;\r\n  color: #cbd5e1;\r\n  text-decoration: none;\r\n  font-size: 13px;\r\n  font-weight: 500;\r\n  border-radius: 6px;\r\n  transition: all 0.2s ease;\r\n  white-space: nowrap;\n}\n.nav-link[data-v-65298cb8]:hover {\r\n  background: #1e293b;\r\n  color: #ffffff;\n}\n.nav-link.active[data-v-65298cb8] {\r\n  background: #2563eb;\r\n  color: #ffffff;\r\n  font-weight: 600;\r\n  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);\n}\n.admin-link[data-v-65298cb8] {\r\n  border: 1px dashed #3b82f6;\n}\n.badge-admin[data-v-65298cb8] {\r\n  font-size: 8px;\r\n  background: #ef4444;\r\n  color: #fff;\r\n  padding: 1px 5px;\r\n  border-radius: 6px;\r\n  font-weight: 800;\r\n  text-transform: uppercase;\n}\r\n\r\n/* USER AUTH BOX BÊN PHẢI */\n.nav-auth[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  margin-left: auto;\n}\n.login-btn[data-v-65298cb8] {\r\n  padding: 7px 16px;\r\n  background: #2563eb;\r\n  color: #ffffff;\r\n  text-decoration: none;\r\n  font-size: 13px;\r\n  font-weight: bold;\r\n  border-radius: 6px;\r\n  transition: background 0.2s;\r\n  white-space: nowrap;\n}\n.login-btn[data-v-65298cb8]:hover {\r\n  background: #1d4ed8;\n}\n.user-profile-wrapper[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  background: #1e293b;\r\n  padding: 4px 6px 4px 10px;\r\n  border-radius: 20px;\r\n  border: 1px solid #334155;\n}\n.user-profile-link[data-v-65298cb8] {\r\n  text-decoration: none;\n}\n.user-profile[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 8px;\n}\n.avatar-circle[data-v-65298cb8] {\r\n  width: 28px;\r\n  height: 28px;\r\n  background: #10b981;\r\n  color: #ffffff;\r\n  font-weight: 800;\r\n  border-radius: 50%;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  font-size: 12px;\r\n  flex-shrink: 0;\n}\n.user-info[data-v-65298cb8] {\r\n  display: flex;\r\n  flex-direction: column;\n}\n.user-name[data-v-65298cb8] {\r\n  font-size: 12px;\r\n  font-weight: bold;\r\n  color: #f8fafc;\r\n  white-space: nowrap;\n}\n.user-role[data-v-65298cb8] {\r\n  font-size: 9px;\r\n  color: #38bdf8;\n}\n.logout-btn[data-v-65298cb8] {\r\n  background: rgba(239, 68, 68, 0.15);\r\n  border: 1px solid rgba(239, 68, 68, 0.3);\r\n  color: #ef4444;\r\n  font-size: 14px;\r\n  cursor: pointer;\r\n  padding: 4px 8px;\r\n  border-radius: 12px;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  transition: all 0.2s ease;\n}\n.logout-btn[data-v-65298cb8]:hover {\r\n  background: #ef4444;\r\n  color: #ffffff;\r\n  transform: scale(1.05);\n}\r\n\r\n/* RESPONSIVE MOBILE */\n@media (max-width: 992px) {\n.hamburger-btn[data-v-65298cb8] {\r\n    display: flex;\r\n    align-items: center;\r\n    justify-content: center;\r\n    background: transparent;\r\n    border: none;\r\n    color: #ffffff;\r\n    font-size: 22px;\r\n    cursor: pointer;\r\n    z-index: 2002;\r\n    width: 36px;\r\n    height: 36px;\n}\n.nav-overlay[data-v-65298cb8] {\r\n    display: block;\r\n    position: fixed;\r\n    top: 0;\r\n    left: 0;\r\n    right: 0;\r\n    bottom: 0;\r\n    background: rgba(0, 0, 0, 0.6);\r\n    backdrop-filter: blur(2px);\r\n    z-index: 2000;\n}\n.nav-content[data-v-65298cb8] {\r\n    position: fixed;\r\n    top: 0;\r\n    right: -280px;\r\n    width: 260px;\r\n    height: 100vh;\r\n    background: #0f172a;\r\n    flex-direction: column;\r\n    justify-content: flex-start;\r\n    align-items: stretch;\r\n    margin-left: 0;\r\n    padding: 70px 16px 20px 16px;\r\n    box-sizing: border-box;\r\n    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);\r\n    z-index: 2001;\r\n    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);\n}\n.nav-content.mobile-open[data-v-65298cb8] {\r\n    right: 0;\n}\n.nav-menu[data-v-65298cb8] {\r\n    flex-direction: column;\r\n    align-items: stretch;\r\n    gap: 8px;\r\n    margin-bottom: 20px;\n}\n.nav-auth[data-v-65298cb8] {\r\n    margin-left: 0;\r\n    margin-top: auto;\r\n    padding-top: 15px;\r\n    border-top: 1px solid #1e293b;\n}\n.user-profile-wrapper[data-v-65298cb8] {\r\n    width: 100%;\r\n    justify-content: space-between;\r\n    box-sizing: border-box;\n}\n.login-btn[data-v-65298cb8] {\r\n    text-align: center;\r\n    width: 100%;\n}\n}\r\n", ""]);
+___CSS_LOADER_EXPORT___.push([module.id, "\r\n/* THANH TOP HEADER NẰM NGANG FULL WIDTH */\n.top-navbar[data-v-65298cb8] {\r\n  width: 100vw;\r\n  height: 60px;\r\n  background: #0f172a;\r\n  color: #f8fafc;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: space-between;\r\n  padding: 0 20px;\r\n  /* Thêm safe-area cho phần tai thỏ / notch nếu có */\r\n  padding-top: env(safe-area-inset-top, 0px); \r\n  box-sizing: border-box;\r\n  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);\r\n  z-index: 2000;\r\n  position: relative;\r\n  -webkit-user-select: none;\r\n     -moz-user-select: none;\r\n          user-select: none;\n}\n.nav-brand[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  flex-shrink: 0;\n}\n.brand-link[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 10px;\r\n  text-decoration: none;\n}\n.logo-box[data-v-65298cb8] {\r\n  width: 36px;\r\n  height: 36px;\r\n  background: #2563eb;\r\n  border-radius: 8px;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  font-weight: bold;\r\n  color: #fff;\r\n  overflow: hidden;\n}\n.logo-img[data-v-65298cb8] {\r\n  width: 100%;\r\n  height: 100%;\r\n  -o-object-fit: cover;\r\n     object-fit: cover;\n}\n.brand-title[data-v-65298cb8] {\r\n  font-size: 14px;\r\n  font-weight: 800;\r\n  margin: 0;\r\n  color: #38bdf8;\r\n  letter-spacing: 0.5px;\n}\n.brand-sub[data-v-65298cb8] {\r\n  font-size: 10px;\r\n  color: #94a3b8;\r\n  display: block;\n}\n.hamburger-btn[data-v-65298cb8], .nav-overlay[data-v-65298cb8] {\r\n  display: none;\n}\n.nav-content[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: space-between;\r\n  flex: 1;\r\n  margin-left: 24px;\n}\n.nav-menu[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nav-link[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 7px 12px;\r\n  color: #cbd5e1;\r\n  text-decoration: none;\r\n  font-size: 13px;\r\n  font-weight: 500;\r\n  border-radius: 6px;\r\n  transition: all 0.2s ease;\r\n  white-space: nowrap;\n}\n.nav-link[data-v-65298cb8]:hover {\r\n  background: #1e293b;\r\n  color: #ffffff;\n}\n.nav-link.active[data-v-65298cb8] {\r\n  background: #2563eb;\r\n  color: #ffffff;\r\n  font-weight: 600;\r\n  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);\n}\n.admin-link[data-v-65298cb8] {\r\n  border: 1px dashed #3b82f6;\n}\n.badge-admin[data-v-65298cb8] {\r\n  font-size: 8px;\r\n  background: #ef4444;\r\n  color: #fff;\r\n  padding: 1px 5px;\r\n  border-radius: 6px;\r\n  font-weight: 800;\r\n  text-transform: uppercase;\n}\r\n\r\n/* USER AUTH BOX BÊN PHẢI */\n.nav-auth[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  margin-left: auto;\n}\n.login-btn[data-v-65298cb8] {\r\n  padding: 10px 16px;\r\n  background: #2563eb;\r\n  color: #ffffff;\r\n  text-decoration: none;\r\n  font-size: 14px;\r\n  font-weight: bold;\r\n  border-radius: 8px;\r\n  transition: background 0.2s;\r\n  white-space: nowrap;\r\n  box-sizing: border-box;\n}\n.login-btn[data-v-65298cb8]:hover {\r\n  background: #1d4ed8;\n}\n.user-profile-wrapper[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  background: #1e293b;\r\n  padding: 4px 6px 4px 10px;\r\n  border-radius: 20px;\r\n  border: 1px solid #334155;\n}\n.user-profile-link[data-v-65298cb8] {\r\n  text-decoration: none;\n}\n.user-profile[data-v-65298cb8] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 8px;\n}\n.avatar-circle[data-v-65298cb8] {\r\n  width: 28px;\r\n  height: 28px;\r\n  background: #10b981;\r\n  color: #ffffff;\r\n  font-weight: 800;\r\n  border-radius: 50%;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  font-size: 12px;\r\n  flex-shrink: 0;\n}\n.user-info[data-v-65298cb8] {\r\n  display: flex;\r\n  flex-direction: column;\n}\n.user-name[data-v-65298cb8] {\r\n  font-size: 12px;\r\n  font-weight: bold;\r\n  color: #f8fafc;\r\n  white-space: nowrap;\n}\n.user-role[data-v-65298cb8] {\r\n  font-size: 9px;\r\n  color: #38bdf8;\n}\n.logout-btn[data-v-65298cb8] {\r\n  background: rgba(239, 68, 68, 0.15);\r\n  border: 1px solid rgba(239, 68, 68, 0.3);\r\n  color: #ef4444;\r\n  font-size: 14px;\r\n  cursor: pointer;\r\n  padding: 4px 8px;\r\n  border-radius: 12px;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  transition: all 0.2s ease;\n}\n.logout-btn[data-v-65298cb8]:hover {\r\n  background: #ef4444;\r\n  color: #ffffff;\r\n  transform: scale(1.05);\n}\r\n\r\n/* RESPONSIVE MOBILE (XỬ LÝ DÀNH RIÊNG CHO IPHONE / SAFARI) */\n@media (max-width: 992px) {\n.hamburger-btn[data-v-65298cb8] {\r\n    display: flex;\r\n    align-items: center;\r\n    justify-content: center;\r\n    background: transparent;\r\n    border: none;\r\n    color: #ffffff;\r\n    font-size: 22px;\r\n    cursor: pointer;\r\n    z-index: 2002;\r\n    width: 36px;\r\n    height: 36px;\n}\n.nav-overlay[data-v-65298cb8] {\r\n    display: block;\r\n    position: fixed;\r\n    top: 0;\r\n    left: 0;\r\n    right: 0;\r\n    bottom: 0;\r\n    background: rgba(0, 0, 0, 0.6);\r\n    backdrop-filter: blur(2px);\r\n    z-index: 2000;\n}\n.nav-content[data-v-65298cb8] {\r\n    position: fixed;\r\n    top: 0;\r\n    right: -280px;\r\n    width: 260px;\r\n    /* 🌟 FIX 1: Chuyển 100vh sang 100dvh để tự co giãn theo thanh trình duyệt di động */\r\n    height: 100vh;\r\n    height: 100dvh; \r\n    background: #0f172a;\r\n    flex-direction: column;\r\n    justify-content: flex-start;\r\n    align-items: stretch;\r\n    margin-left: 0;\r\n    /* 🌟 FIX 2: Thêm pb (padding-bottom) có tính Safe Area cho mép dưới iPhone */\r\n    padding: 70px 16px calc(24px + env(safe-area-inset-bottom, 0px)) 16px;\r\n    box-sizing: border-box;\r\n    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);\r\n    z-index: 2001;\r\n    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);\r\n    overflow-y: auto; /* Cho phép cuộn nếu màn hình quá ngắn */\n}\n.nav-content.mobile-open[data-v-65298cb8] {\r\n    right: 0;\n}\n.nav-menu[data-v-65298cb8] {\r\n    flex-direction: column;\r\n    align-items: stretch;\r\n    gap: 12px;\r\n    margin-bottom: 20px;\n}\n.nav-link[data-v-65298cb8] {\r\n    padding: 10px 14px;\r\n    font-size: 14px;\n}\n.nav-auth[data-v-65298cb8] {\r\n    margin-left: 0;\r\n    margin-top: auto;\r\n    padding-top: 20px;\r\n    border-top: 1px solid #1e293b;\r\n    /* 🌟 FIX 3: Khoảng cách an toàn bổ sung ở chân Menu */\r\n    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));\n}\n.user-profile-wrapper[data-v-65298cb8] {\r\n    width: 100%;\r\n    justify-content: space-between;\r\n    box-sizing: border-box;\n}\n.login-btn[data-v-65298cb8] {\r\n    text-align: center;\r\n    width: 100%;\r\n    display: block;\r\n    padding: 12px 16px; /* Làm nút to ra hơn một chút để dễ bấm trên điện thoại */\n}\n}\r\n", ""]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -29937,7 +29892,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(function(i){return i[1]});
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "\r\n/* KHUNG CHÍNH CĂN GIỮA TIÊU CHUẨN ĐỘ RỘNG WEB (MAX-WIDTH: 1140PX) */\n.contact-page[data-v-2c2b26f2] {\r\n  background-color: #f8fafc;\r\n  min-height: 100vh;\r\n  padding-bottom: 60px;\n}\n.main-container[data-v-2c2b26f2] {\r\n  max-width: 1140px;\r\n  margin: 0 auto;\r\n  padding: 24px 16px;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 32px;\n}\r\n\r\n/* BANNER TIÊU ĐỀ TRANG BAN ĐẦU */\n.page-banner[data-v-2c2b26f2] {\r\n  background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);\r\n  color: #ffffff;\r\n  padding: 32px 24px;\r\n  border-radius: 16px;\r\n  text-align: center;\r\n  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);\n}\n.sub-title[data-v-2c2b26f2] {\r\n  font-size: 13px;\r\n  letter-spacing: 1px;\r\n  text-transform: uppercase;\r\n  color: #93c5fd;\r\n  font-weight: 700;\n}\n.main-title[data-v-2c2b26f2] {\r\n  font-size: 28px;\r\n  font-weight: 800;\r\n  margin: 8px 0 12px 0;\r\n  color: #ffffff;\n}\n.location-tag[data-v-2c2b26f2] {\r\n  font-size: 14px;\r\n  color: #cbd5e1;\r\n  margin: 0;\n}\r\n\r\n/* PHẦN I: BẢNG GIỚI THIỆU KHÁI QUÁT KHU CÔNG NGHIỆP */\n.info-section[data-v-2c2b26f2] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 20px;\n}\n.section-title[data-v-2c2b26f2] {\r\n  font-size: 20px;\r\n  font-weight: 800;\r\n  color: #0f172a;\r\n  border-left: 4px solid #2563eb;\r\n  padding-left: 12px;\r\n  margin: 0;\n}\n.info-card[data-v-2c2b26f2] {\r\n  background: #ffffff;\r\n  border-radius: 12px;\r\n  padding: 20px;\r\n  border: 1px solid #e2e8f0;\r\n  box-shadow: 0 2px 8px rgba(0,0,0,0.04);\n}\n.card-title[data-v-2c2b26f2] {\r\n  font-size: 16px;\r\n  font-weight: 700;\r\n  color: #1e3a8a;\r\n  margin-top: 0;\r\n  margin-bottom: 14px;\r\n  border-bottom: 1px dashed #cbd5e1;\r\n  padding-bottom: 8px;\n}\r\n\r\n/* STYLED TABLES */\n.table-responsive[data-v-2c2b26f2] { overflow-x: auto;\n}\n.info-table[data-v-2c2b26f2] { width: 100%; border-collapse: collapse; font-size: 14px;\n}\n.info-table td[data-v-2c2b26f2] { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top;\n}\n.label-col[data-v-2c2b26f2] { width: 220px; font-weight: 700; color: #475569; background: #f8fafc;\n}\n.value-col[data-v-2c2b26f2] { color: #1e293b;\n}\n.badge-full[data-v-2c2b26f2] {\r\n  background: #dcfce7;\r\n  color: #15803d;\r\n  padding: 4px 10px;\r\n  border-radius: 6px;\r\n  font-weight: bold;\r\n  font-size: 13px;\n}\n.styled-list[data-v-2c2b26f2] { margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6;\n}\n.step-list[data-v-2c2b26f2] { margin: 6px 0 0 0; padding-left: 20px; line-height: 1.8; font-weight: 600; color: #334155;\n}\r\n\r\n/* KHUNG CHI PHÍ 3 CỘT */\n.grid-3[data-v-2c2b26f2] { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;\n}\n.cost-box[data-v-2c2b26f2] {\r\n  background: #eff6ff;\r\n  border: 1px solid #bfdbfe;\r\n  padding: 16px;\r\n  border-radius: 10px;\r\n  display: flex;\r\n  flex-direction: column;\r\n  align-items: center;\r\n  text-align: center;\n}\n.cost-label[data-v-2c2b26f2] { font-size: 13px; color: #1e40af; font-weight: 600;\n}\n.cost-value[data-v-2c2b26f2] { font-size: 17px; font-weight: 800; color: #1e3a8a; margin-top: 4px;\n}\n.cost-sub[data-v-2c2b26f2] { font-size: 11px; color: #64748b; margin-top: 4px;\n}\r\n\r\n/* KHUNG THÔNG TIN LIÊN HỆ TRỰC TIẾP */\n.direct-contact-bar[data-v-2c2b26f2] {\r\n  background: #ffffff;\r\n  border: 2px solid #2563eb;\r\n  border-radius: 12px;\r\n  padding: 20px;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 16px;\r\n  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.08);\n}\n.contact-info-item[data-v-2c2b26f2] { display: flex; gap: 14px; align-items: flex-start;\n}\n.contact-info-item .icon[data-v-2c2b26f2] { font-size: 22px; background: #eff6ff; padding: 8px; border-radius: 8px;\n}\n.contact-info-item p[data-v-2c2b26f2] { margin: 3px 0 0 0; font-size: 14px; color: #334155;\n}\n.phone-call-btn[data-v-2c2b26f2] {\r\n  color: #dc2626 !important;\r\n  font-weight: 800;\r\n  font-size: 18px;\r\n  text-decoration: none;\n}\n.phone-call-btn span[data-v-2c2b26f2] { font-size: 12px; color: #2563eb; text-decoration: underline; font-weight: normal;\n}\r\n\r\n/* ================================================================= */\r\n/* PHẦN II: FORM LIÊN HỆ NỔI BẬT CHÍNH GIỮA KHUNG */\r\n/* ================================================================= */\n.contact-form-wrapper[data-v-2c2b26f2] {\r\n  display: flex;\r\n  justify-content: center;\r\n  margin-top: 10px;\n}\n.form-card[data-v-2c2b26f2] {\r\n  width: 100%;\r\n  max-width: 720px; /* Căn giữa nổi bật tiêu chuẩn */\r\n  background: #ffffff;\r\n  border-radius: 16px;\r\n  padding: 32px;\r\n  border: 1px solid #cbd5e1;\r\n  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);\n}\n.form-header[data-v-2c2b26f2] {\r\n  text-align: center;\r\n  margin-bottom: 24px;\n}\n.form-header h2[data-v-2c2b26f2] {\r\n  font-size: 22px;\r\n  font-weight: 800;\r\n  color: #0f172a;\r\n  margin: 0 0 6px 0;\n}\n.form-header p[data-v-2c2b26f2] {\r\n  font-size: 13px;\r\n  color: #64748b;\r\n  margin: 0;\n}\n.contact-form[data-v-2c2b26f2] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 16px;\n}\n.form-group[data-v-2c2b26f2] { display: flex; flex-direction: column; gap: 6px;\n}\n.form-row[data-v-2c2b26f2] { display: flex; gap: 16px;\n}\n.half[data-v-2c2b26f2] { flex: 1;\n}\nlabel[data-v-2c2b26f2] { font-size: 13px; font-weight: 700; color: #334155;\n}\n.required[data-v-2c2b26f2] { color: #dc2626;\n}\ninput[data-v-2c2b26f2], textarea[data-v-2c2b26f2] {\r\n  width: 100%;\r\n  padding: 11px 14px;\r\n  border: 1px solid #cbd5e1;\r\n  border-radius: 8px;\r\n  font-size: 14px;\r\n  box-sizing: border-box;\r\n  outline: none;\r\n  transition: all 0.2s ease;\r\n  background-color: #f8fafc;\n}\ninput[data-v-2c2b26f2]:focus, textarea[data-v-2c2b26f2]:focus {\r\n  border-color: #2563eb;\r\n  background-color: #ffffff;\r\n  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);\n}\ninput.input-error[data-v-2c2b26f2], textarea.input-error[data-v-2c2b26f2] {\r\n  border-color: #dc2626;\r\n  background-color: #fef2f2;\n}\n.error-msg[data-v-2c2b26f2] { font-size: 11px; color: #dc2626; font-weight: 600;\n}\r\n\r\n/* NÚT GỬI VÀ TRẠNG THÁI DISABLE */\n.form-actions[data-v-2c2b26f2] { margin-top: 10px;\n}\n.btn-submit[data-v-2c2b26f2] {\r\n  width: 100%;\r\n  padding: 14px;\r\n  background: #2563eb;\r\n  color: #ffffff;\r\n  border: none;\r\n  border-radius: 10px;\r\n  font-size: 16px;\r\n  font-weight: 800;\r\n  cursor: pointer;\r\n  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);\r\n  transition: all 0.2s ease;\n}\n.btn-submit[data-v-2c2b26f2]:hover:not(:disabled) {\r\n  background: #1d4ed8;\r\n  transform: translateY(-1px);\n}\n.btn-disabled[data-v-2c2b26f2], .btn-submit[data-v-2c2b26f2]:disabled {\r\n  background: #94a3b8 !important;\r\n  cursor: not-allowed !important;\r\n  box-shadow: none !important;\r\n  opacity: 0.7;\n}\n.target-email-notice[data-v-2c2b26f2] {\r\n  text-align: center;\r\n  font-size: 11px;\r\n  color: #64748b;\r\n  margin-top: 12px;\n}\n.target-email-notice code[data-v-2c2b26f2] {\r\n  background: #f1f5f9;\r\n  padding: 2px 6px;\r\n  border-radius: 4px;\r\n  color: #0f172a;\r\n  font-weight: bold;\n}\n.alert-success[data-v-2c2b26f2] {\r\n  background-color: #dcfce7 !important;\r\n  color: #15803d !important;\r\n  border: 1px solid #86efac !important;\r\n  padding: 14px 18px !important;\r\n  border-radius: 10px !important;\r\n  font-size: 15px !important;\r\n  font-weight: 700 !important;\r\n  margin-bottom: 20px !important;\r\n  text-align: center !important;\r\n  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.1) !important;\r\n  animation: fadeIn-2c2b26f2 0.4s ease-in-out;\n}\n@keyframes fadeIn-2c2b26f2 {\nfrom { opacity: 0; transform: translateY(-8px);\n}\nto { opacity: 1; transform: translateY(0);\n}\n}\r\n\r\n/* RESPONSIVE MOBILE */\n@media (max-width: 768px) {\n.form-row[data-v-2c2b26f2] { flex-direction: column; gap: 16px;\n}\n.label-col[data-v-2c2b26f2] { width: 100%; display: block;\n}\n.value-col[data-v-2c2b26f2] { display: block;\n}\n.form-card[data-v-2c2b26f2] { padding: 20px;\n}\n}\r\n", ""]);
+___CSS_LOADER_EXPORT___.push([module.id, "\r\n/* KHUNG CHÍNH CĂN GIỮA TIÊU CHUẨN ĐỘ RỘNG WEB (MAX-WIDTH: 1140PX) */\n.contact-page[data-v-2c2b26f2] {\r\n  background-color: #f8fafc;\r\n  min-height: 100dvh;\r\n  padding-bottom: 60px;\n}\n.main-container[data-v-2c2b26f2] {\r\n  max-width: 1140px;\r\n  margin: 0 auto;\r\n  padding: 24px 16px;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 32px;\n}\r\n\r\n/* BANNER TIÊU ĐỀ TRANG BAN ĐẦU */\n.page-banner[data-v-2c2b26f2] {\r\n  background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);\r\n  color: #ffffff;\r\n  padding: 32px 24px;\r\n  border-radius: 16px;\r\n  text-align: center;\r\n  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);\n}\n.sub-title[data-v-2c2b26f2] {\r\n  font-size: 13px;\r\n  letter-spacing: 1px;\r\n  text-transform: uppercase;\r\n  color: #93c5fd;\r\n  font-weight: 700;\n}\n.main-title[data-v-2c2b26f2] {\r\n  font-size: 28px;\r\n  font-weight: 800;\r\n  margin: 8px 0 12px 0;\r\n  color: #ffffff;\n}\n.location-tag[data-v-2c2b26f2] {\r\n  font-size: 14px;\r\n  color: #cbd5e1;\r\n  margin: 0;\n}\r\n\r\n/* PHẦN I: BẢNG GIỚI THIỆU KHÁI QUÁT KHU CÔNG NGHIỆP */\n.info-section[data-v-2c2b26f2] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 20px;\n}\n.section-title[data-v-2c2b26f2] {\r\n  font-size: 20px;\r\n  font-weight: 800;\r\n  color: #0f172a;\r\n  border-left: 4px solid #2563eb;\r\n  padding-left: 12px;\r\n  margin: 0;\n}\n.info-card[data-v-2c2b26f2] {\r\n  background: #ffffff;\r\n  border-radius: 12px;\r\n  padding: 20px;\r\n  border: 1px solid #e2e8f0;\r\n  box-shadow: 0 2px 8px rgba(0,0,0,0.04);\n}\n.card-title[data-v-2c2b26f2] {\r\n  font-size: 16px;\r\n  font-weight: 700;\r\n  color: #1e3a8a;\r\n  margin-top: 0;\r\n  margin-bottom: 14px;\r\n  border-bottom: 1px dashed #cbd5e1;\r\n  padding-bottom: 8px;\n}\r\n\r\n/* STYLED TABLES */\n.table-responsive[data-v-2c2b26f2] { overflow-x: auto;\n}\n.info-table[data-v-2c2b26f2] { width: 100%; border-collapse: collapse; font-size: 14px;\n}\n.info-table td[data-v-2c2b26f2] { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top;\n}\n.label-col[data-v-2c2b26f2] { width: 220px; font-weight: 700; color: #475569; background: #f8fafc;\n}\n.value-col[data-v-2c2b26f2] { color: #1e293b;\n}\n.badge-full[data-v-2c2b26f2] {\r\n  background: #dcfce7;\r\n  color: #15803d;\r\n  padding: 4px 10px;\r\n  border-radius: 6px;\r\n  font-weight: bold;\r\n  font-size: 13px;\n}\n.styled-list[data-v-2c2b26f2] { margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6;\n}\n.step-list[data-v-2c2b26f2] { margin: 6px 0 0 0; padding-left: 20px; line-height: 1.8; font-weight: 600; color: #334155;\n}\r\n\r\n/* KHUNG CHI PHÍ 3 CỘT */\n.grid-3[data-v-2c2b26f2] { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;\n}\n.cost-box[data-v-2c2b26f2] {\r\n  background: #eff6ff;\r\n  border: 1px solid #bfdbfe;\r\n  padding: 16px;\r\n  border-radius: 10px;\r\n  display: flex;\r\n  flex-direction: column;\r\n  align-items: center;\r\n  text-align: center;\n}\n.cost-label[data-v-2c2b26f2] { font-size: 13px; color: #1e40af; font-weight: 600;\n}\n.cost-value[data-v-2c2b26f2] { font-size: 17px; font-weight: 800; color: #1e3a8a; margin-top: 4px;\n}\n.cost-sub[data-v-2c2b26f2] { font-size: 11px; color: #64748b; margin-top: 4px;\n}\r\n\r\n/* KHUNG THÔNG TIN LIÊN HỆ TRỰC TIẾP */\n.direct-contact-bar[data-v-2c2b26f2] {\r\n  background: #ffffff;\r\n  border: 2px solid #2563eb;\r\n  border-radius: 12px;\r\n  padding: 20px;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 16px;\r\n  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.08);\n}\n.contact-info-item[data-v-2c2b26f2] { display: flex; gap: 14px; align-items: flex-start;\n}\n.contact-info-item .icon[data-v-2c2b26f2] { font-size: 22px; background: #eff6ff; padding: 8px; border-radius: 8px;\n}\n.contact-info-item p[data-v-2c2b26f2] { margin: 3px 0 0 0; font-size: 14px; color: #334155;\n}\n.phone-call-btn[data-v-2c2b26f2] {\r\n  color: #dc2626 !important;\r\n  font-weight: 800;\r\n  font-size: 18px;\r\n  text-decoration: none;\n}\n.phone-call-btn span[data-v-2c2b26f2] { font-size: 12px; color: #2563eb; text-decoration: underline; font-weight: normal;\n}\r\n\r\n/* ================================================================= */\r\n/* PHẦN II: FORM LIÊN HỆ NỔI BẬT CHÍNH GIỮA KHUNG */\r\n/* ================================================================= */\n.contact-form-wrapper[data-v-2c2b26f2] {\r\n  display: flex;\r\n  justify-content: center;\r\n  margin-top: 10px;\n}\n.form-card[data-v-2c2b26f2] {\r\n  width: 100%;\r\n  max-width: 720px; /* Căn giữa nổi bật tiêu chuẩn */\r\n  background: #ffffff;\r\n  border-radius: 16px;\r\n  padding: 32px;\r\n  border: 1px solid #cbd5e1;\r\n  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);\n}\n.form-header[data-v-2c2b26f2] {\r\n  text-align: center;\r\n  margin-bottom: 24px;\n}\n.form-header h2[data-v-2c2b26f2] {\r\n  font-size: 22px;\r\n  font-weight: 800;\r\n  color: #0f172a;\r\n  margin: 0 0 6px 0;\n}\n.form-header p[data-v-2c2b26f2] {\r\n  font-size: 13px;\r\n  color: #64748b;\r\n  margin: 0;\n}\n.contact-form[data-v-2c2b26f2] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 16px;\n}\n.form-group[data-v-2c2b26f2] { display: flex; flex-direction: column; gap: 6px;\n}\n.form-row[data-v-2c2b26f2] { display: flex; gap: 16px;\n}\n.half[data-v-2c2b26f2] { flex: 1;\n}\nlabel[data-v-2c2b26f2] { font-size: 13px; font-weight: 700; color: #334155;\n}\n.required[data-v-2c2b26f2] { color: #dc2626;\n}\ninput[data-v-2c2b26f2], textarea[data-v-2c2b26f2] {\r\n  width: 100%;\r\n  padding: 11px 14px;\r\n  border: 1px solid #cbd5e1;\r\n  border-radius: 8px;\r\n  font-size: 14px;\r\n  box-sizing: border-box;\r\n  outline: none;\r\n  transition: all 0.2s ease;\r\n  background-color: #f8fafc;\n}\ninput[data-v-2c2b26f2]:focus, textarea[data-v-2c2b26f2]:focus {\r\n  border-color: #2563eb;\r\n  background-color: #ffffff;\r\n  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);\n}\ninput.input-error[data-v-2c2b26f2], textarea.input-error[data-v-2c2b26f2] {\r\n  border-color: #dc2626;\r\n  background-color: #fef2f2;\n}\n.error-msg[data-v-2c2b26f2] { font-size: 11px; color: #dc2626; font-weight: 600;\n}\r\n\r\n/* NÚT GỬI VÀ TRẠNG THÁI DISABLE */\n.form-actions[data-v-2c2b26f2] { margin-top: 10px;\n}\n.btn-submit[data-v-2c2b26f2] {\r\n  width: 100%;\r\n  padding: 14px;\r\n  background: #2563eb;\r\n  color: #ffffff;\r\n  border: none;\r\n  border-radius: 10px;\r\n  font-size: 16px;\r\n  font-weight: 800;\r\n  cursor: pointer;\r\n  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);\r\n  transition: all 0.2s ease;\n}\n.btn-submit[data-v-2c2b26f2]:hover:not(:disabled) {\r\n  background: #1d4ed8;\r\n  transform: translateY(-1px);\n}\n.btn-disabled[data-v-2c2b26f2], .btn-submit[data-v-2c2b26f2]:disabled {\r\n  background: #94a3b8 !important;\r\n  cursor: not-allowed !important;\r\n  box-shadow: none !important;\r\n  opacity: 0.7;\n}\n.target-email-notice[data-v-2c2b26f2] {\r\n  text-align: center;\r\n  font-size: 11px;\r\n  color: #64748b;\r\n  margin-top: 12px;\n}\n.target-email-notice code[data-v-2c2b26f2] {\r\n  background: #f1f5f9;\r\n  padding: 2px 6px;\r\n  border-radius: 4px;\r\n  color: #0f172a;\r\n  font-weight: bold;\n}\n.alert-success[data-v-2c2b26f2] {\r\n  background-color: #dcfce7 !important;\r\n  color: #15803d !important;\r\n  border: 1px solid #86efac !important;\r\n  padding: 14px 18px !important;\r\n  border-radius: 10px !important;\r\n  font-size: 15px !important;\r\n  font-weight: 700 !important;\r\n  margin-bottom: 20px !important;\r\n  text-align: center !important;\r\n  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.1) !important;\r\n  animation: fadeIn-2c2b26f2 0.4s ease-in-out;\n}\n@keyframes fadeIn-2c2b26f2 {\nfrom { opacity: 0; transform: translateY(-8px);\n}\nto { opacity: 1; transform: translateY(0);\n}\n}\r\n\r\n/* RESPONSIVE MOBILE */\n@media (max-width: 768px) {\n.form-row[data-v-2c2b26f2] { flex-direction: column; gap: 16px;\n}\n.label-col[data-v-2c2b26f2] { width: 100%; display: block;\n}\n.value-col[data-v-2c2b26f2] { display: block;\n}\n.form-card[data-v-2c2b26f2] { padding: 20px;\n}\n}\r\n", ""]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -29961,7 +29916,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(function(i){return i[1]});
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "\n.webgis-page[data-v-6ffb2f43] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  height: 100vh;\r\n  width: 100vw;\r\n  overflow: hidden;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n}\n.webgis-content[data-v-6ffb2f43] {\r\n  display: flex;\r\n  flex: 1;\r\n  height: calc(100vh - 60px);\r\n  position: relative;\r\n  overflow: hidden;\n}\n.map-container[data-v-6ffb2f43] {\r\n  flex: 1;\r\n  height: 100%;\r\n  z-index: 1;\n}\n.factory-info-panel[data-v-6ffb2f43] {\r\n  position: absolute;\r\n  top: 20px;\r\n  right: 20px;\r\n  width: 320px;\r\n  max-height: calc(100vh - 100px);\r\n  background: #ffffff;\r\n  border-radius: 12px;\r\n  box-shadow: 0 4px 20px rgba(0,0,0,0.2);\r\n  z-index: 1000;\r\n  padding: 18px;\r\n  overflow-y: auto;\n}\n.panel-header[data-v-6ffb2f43] { display: flex; justify-content: space-between; align-items: flex-start;\n}\n.factory-code[data-v-6ffb2f43] { margin: 5px 0 0 0; font-size: 16px;\n}\n.close-btn[data-v-6ffb2f43] { border: none; background: #f1f5f9; padding: 6px 10px; border-radius: 50%; cursor: pointer; font-weight: bold;\n}\n.badge[data-v-6ffb2f43] { display: inline-block; padding: 3px 8px; border-radius: 4px; color: #fff; font-size: 11px; font-weight: bold;\n}\n.badge.rented[data-v-6ffb2f43] { background-color: #dc3545;\n}\n.badge.available[data-v-6ffb2f43] { background-color: #28a745;\n}\n.badge.under_construction[data-v-6ffb2f43] { background-color: #ffc107; color: #000;\n}\n.phone-link[data-v-6ffb2f43] { color: #0d6efd; text-decoration: none; font-weight: bold;\n}\n.locate-btn[data-v-6ffb2f43] {\r\n  position: absolute;\r\n  bottom: 97px;\r\n  right: 8px;\r\n  z-index: 1000;\r\n  width: 40px;\r\n  height: 40px;\r\n  background: #ffffff;\r\n  border: 2px solid rgba(0, 0, 0, 0.2);\r\n  border-radius: 50%;\r\n  font-size: 18px;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  cursor: pointer;\r\n  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);\r\n  transition: all 0.2s ease;\n}\n.locate-btn[data-v-6ffb2f43]:hover { background: #f4f4f4; transform: scale(1.05);\n}\n.locate-btn[data-v-6ffb2f43]:active { transform: scale(0.95);\n}\n@media (max-width: 768px) {\n.factory-info-panel[data-v-6ffb2f43] {\r\n    top: auto;\r\n    bottom: 0;\r\n    left: 0;\r\n    right: 0;\r\n    width: 100%;\r\n    max-height: 60vh;\r\n    border-radius: 16px 16px 0 0;\r\n    box-sizing: border-box;\n}\n}\n[data-v-6ffb2f43] .directions-btn {\r\n  display: inline-block;\r\n  width: 100%;\r\n  text-align: center;\r\n  padding: 6px 10px;\r\n  background-color: #10b981;\r\n  color: #ffffff !important;\r\n  text-decoration: none;\r\n  font-weight: bold;\r\n  font-size: 12px;\r\n  border-radius: 6px;\r\n  box-sizing: border-box;\n}\n.directions-btn-block[data-v-6ffb2f43] {\r\n  display: block;\r\n  text-align: center;\r\n  padding: 10px;\r\n  background-color: #10b981;\r\n  color: #ffffff !important;\r\n  text-decoration: none;\r\n  font-weight: bold;\r\n  font-size: 13px;\r\n  border-radius: 8px;\r\n  margin: 10px 0;\r\n  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);\n}\r\n\r\n/* STYLES CHO CÁC LOẠI NHÃN TRÊN BẢN ĐỒ */\n[data-v-6ffb2f43] .greenery-label {\r\n  background-color: rgba(255, 255, 255, 0.9) !important; color: #15803d !important;\r\n  font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;\r\n  border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;\r\n  pointer-events: none !important; /* Xuyên chuột qua nhãn tên */\n}\n[data-v-6ffb2f43] .greenery-label::before { display: none !important;\n}\n[data-v-6ffb2f43] .water-label {\r\n  background-color: rgba(255, 255, 255, 0.9) !important; color: #0369a1 !important;\r\n  font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;\r\n  border-radius: 4px !important; border: 1px solid #0284c7 !important; white-space: nowrap !important;\r\n  pointer-events: none !important; /* Xuyên chuột qua nhãn tên */\n}\n[data-v-6ffb2f43] .water-label::before { display: none !important;\n}\n[data-v-6ffb2f43] .factory-label {\r\n  background-color: rgba(255, 255, 255, 0.9) !important; color: #166534 !important;\r\n  font-weight: 700 !important; font-size: 11px !important; padding: 2px 6px !important;\r\n  border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;\r\n  pointer-events: none !important; /* Xuyên chuột qua nhãn tên */\n}\n[data-v-6ffb2f43] .factory-label::before { display: none !important;\n}\n[data-v-6ffb2f43] .street-name-sign {\r\n  background-color: #0284c7 !important;\r\n  color: #ffffff !important;\r\n  font-weight: 700 !important;\r\n  font-size: 8px !important;\r\n  padding: 3px 8px !important;\r\n  border-radius: 4px !important;\r\n  border: 1.5px solid #ffffff !important;\r\n  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;\r\n  white-space: nowrap !important;\r\n  text-transform: uppercase !important;\r\n  pointer-events: none !important;\n}\n[data-v-6ffb2f43] .street-name-sign::before { display: none !important;\n}\n[data-v-6ffb2f43] .plot-label {\r\n  background-color: rgba(255, 255, 255, 0.85) !important;\r\n  color: #0f172a !important;\r\n  font-weight: 700 !important;\r\n  font-size: 11px !important;\r\n  padding: 2px 6px !important;\r\n  border-radius: 4px !important;\r\n  border: 1px solid #94a3b8 !important;\r\n  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;\r\n  white-space: nowrap !important;\r\n  pointer-events: none !important;\n}\r\n", ""]);
+___CSS_LOADER_EXPORT___.push([module.id, "\n.webgis-page[data-v-6ffb2f43] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  height: 100vh;\r\n  height: 100dvh; /* Co giãn chuẩn theo thanh trình duyệt di động */\r\n  width: 100vw;\r\n  overflow: hidden;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n}\n.webgis-content[data-v-6ffb2f43] {\r\n  display: flex;\r\n  flex: 1;\r\n  position: relative;\r\n  overflow: hidden;\n}\n.map-container[data-v-6ffb2f43] {\r\n  flex: 1;\r\n  height: 100%;\r\n  width: 100%;\r\n  z-index: 1;\n}\n.factory-info-panel[data-v-6ffb2f43] {\r\n  position: absolute;\r\n  top: 20px;\r\n  right: 20px;\r\n  width: 320px;\r\n  max-height: calc(100dvh - 100px);\r\n  background: #ffffff;\r\n  border-radius: 12px;\r\n  box-shadow: 0 4px 20px rgba(0,0,0,0.2);\r\n  z-index: 1000;\r\n  padding: 18px;\r\n  overflow-y: auto;\n}\n.panel-header[data-v-6ffb2f43] { display: flex; justify-content: space-between; align-items: flex-start;\n}\n.factory-code[data-v-6ffb2f43] { margin: 5px 0 0 0; font-size: 16px;\n}\n.close-btn[data-v-6ffb2f43] { border: none; background: #f1f5f9; padding: 6px 10px; border-radius: 50%; cursor: pointer; font-weight: bold;\n}\n.badge[data-v-6ffb2f43] { display: inline-block; padding: 3px 8px; border-radius: 4px; color: #fff; font-size: 11px; font-weight: bold;\n}\n.badge.rented[data-v-6ffb2f43] { background-color: #dc3545;\n}\n.badge.available[data-v-6ffb2f43] { background-color: #28a745;\n}\n.badge.under_construction[data-v-6ffb2f43] { background-color: #ffc107; color: #000;\n}\n.phone-link[data-v-6ffb2f43] { color: #0d6efd; text-decoration: none; font-weight: bold;\n}\r\n\r\n/* 🎯 NÚT ĐỊNH VỊ CÓ TÍNH TỚI VÙNG AN TOÀN SAFE-AREA */\n.locate-btn[data-v-6ffb2f43] {\r\n  position: absolute;\r\n  bottom: calc(90px + env(safe-area-inset-bottom, 0px));\r\n  right: 12px;\r\n  z-index: 1000;\r\n  width: 42px;\r\n  height: 42px;\r\n  background: #ffffff;\r\n  border: 2px solid rgba(0, 0, 0, 0.2);\r\n  border-radius: 50%;\r\n  font-size: 18px;\r\n  display: flex;\r\n  align-items: center;\r\n  justify-content: center;\r\n  cursor: pointer;\r\n  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);\r\n  transition: all 0.2s ease;\n}\n.locate-btn[data-v-6ffb2f43]:hover { background: #f4f4f4; transform: scale(1.05);\n}\n.locate-btn[data-v-6ffb2f43]:active { transform: scale(0.95);\n}\n@media (max-width: 768px) {\n.factory-info-panel[data-v-6ffb2f43] {\r\n    top: auto;\r\n    bottom: 0;\r\n    left: 0;\r\n    right: 0;\r\n    width: 100%;\r\n    max-height: 60vh;\r\n    border-radius: 16px 16px 0 0;\r\n    box-sizing: border-box;\r\n    /* Dán padding-bottom cẩn thận để không bị thanh Home Indicator che */\r\n    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));\n}\n}\n[data-v-6ffb2f43] .directions-btn {\r\n  display: inline-block;\r\n  width: 100%;\r\n  text-align: center;\r\n  padding: 6px 10px;\r\n  background-color: #10b981;\r\n  color: #ffffff !important;\r\n  text-decoration: none;\r\n  font-weight: bold;\r\n  font-size: 12px;\r\n  border-radius: 6px;\r\n  box-sizing: border-box;\n}\n.directions-btn-block[data-v-6ffb2f43] {\r\n  display: block;\r\n  text-align: center;\r\n  padding: 10px;\r\n  background-color: #10b981;\r\n  color: #ffffff !important;\r\n  text-decoration: none;\r\n  font-weight: bold;\r\n  font-size: 13px;\r\n  border-radius: 8px;\r\n  margin: 10px 0;\r\n  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);\n}\r\n\r\n/* STYLES CHO CÁC LOẠI NHÃN TRÊN BẢN ĐỒ */\n[data-v-6ffb2f43] .greenery-label {\r\n  background-color: rgba(255, 255, 255, 0.9) !important; color: #15803d !important;\r\n  font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;\r\n  border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;\r\n  pointer-events: none !important;\n}\n[data-v-6ffb2f43] .greenery-label::before { display: none !important;\n}\n[data-v-6ffb2f43] .water-label {\r\n  background-color: rgba(255, 255, 255, 0.9) !important; color: #0369a1 !important;\r\n  font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;\r\n  border-radius: 4px !important; border: 1px solid #0284c7 !important; white-space: nowrap !important;\r\n  pointer-events: none !important;\n}\n[data-v-6ffb2f43] .water-label::before { display: none !important;\n}\n[data-v-6ffb2f43] .factory-label {\r\n  background-color: rgba(255, 255, 255, 0.9) !important; color: #166534 !important;\r\n  font-weight: 700 !important; font-size: 11px !important; padding: 2px 6px !important;\r\n  border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;\r\n  pointer-events: none !important;\n}\n[data-v-6ffb2f43] .factory-label::before { display: none !important;\n}\n[data-v-6ffb2f43] .street-name-sign {\r\n  background-color: #0284c7 !important;\r\n  color: #ffffff !important;\r\n  font-weight: 700 !important;\r\n  font-size: 8px !important;\r\n  padding: 3px 8px !important;\r\n  border-radius: 4px !important;\r\n  border: 1.5px solid #ffffff !important;\r\n  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;\r\n  white-space: nowrap !important;\r\n  text-transform: uppercase !important;\r\n  pointer-events: none !important;\n}\n[data-v-6ffb2f43] .street-name-sign::before { display: none !important;\n}\n[data-v-6ffb2f43] .plot-label {\r\n  background-color: rgba(255, 255, 255, 0.85) !important;\r\n  color: #0f172a !important;\r\n  font-weight: 700 !important;\r\n  font-size: 11px !important;\r\n  padding: 2px 6px !important;\r\n  border-radius: 4px !important;\r\n  border: 1px solid #94a3b8 !important;\r\n  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;\r\n  white-space: nowrap !important;\r\n  pointer-events: none !important;\n}\r\n", ""]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -29985,7 +29940,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(function(i){return i[1]});
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "\r\n/* STYLE GLOBAL CHO LEAFLET CONTROLS & BẢNG CHÚ THÍCH */\n.leaflet-bottom.leaflet-left {\r\n  z-index: 999 !important;\r\n  margin-bottom: 20px !important;\r\n  margin-left: 15px !important;\n}\n.custom-map-legend {\r\n  background: rgba(255, 255, 255, 0.95) !important;\r\n  backdrop-filter: blur(6px) !important;\r\n  padding: 10px 14px !important;\r\n  border-radius: 8px !important;\r\n  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;\r\n  border: 1px solid #cbd5e1 !important;\r\n  font-family: \"Open Sans\", \"Helvetica Neue\", Helvetica, Arial, sans-serif !important;\r\n  min-width: 160px !important;\r\n  display: block !important;\r\n  visibility: visible !important;\n}\n.custom-map-legend .legend-header {\r\n  font-size: 11px !important;\r\n  font-weight: 800 !important;\r\n  color: #0f172a !important;\r\n  margin-bottom: 8px !important;\r\n  border-bottom: 1px solid #e2e8f0 !important;\r\n  padding-bottom: 4px !important;\r\n  letter-spacing: 0.5px !important;\r\n  text-transform: uppercase !important;\n}\n.custom-map-legend .legend-list {\r\n  display: flex !important;\r\n  flex-direction: column !important;\r\n  gap: 6px !important;\n}\n.custom-map-legend .legend-item {\r\n  display: flex !important;\r\n  align-items: center !important;\r\n  gap: 8px !important;\n}\n.custom-map-legend .legend-text {\r\n  font-size: 10px !important;\r\n  font-weight: 600 !important;\r\n  color: #334155 !important;\n}\n.custom-map-legend .rainwater-point {\r\n  width: 12px !important; height: 12px !important; border-radius: 50% !important;\r\n  background-color: #007bff !important; border: 2px solid #ffffff !important;\r\n  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;\n}\n.custom-map-legend .wastewater-point {\r\n  width: 12px !important; height: 12px !important; border-radius: 50% !important;\r\n  background-color: #800080 !important; border: 2px solid #ffffff !important;\r\n  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;\n}\n.custom-map-legend .road-line {\r\n  width: 16px !important; height: 4px !important; background-color: #FFE082 !important;\r\n  border-radius: 2px !important; display: inline-block !important;\n}\n.custom-map-legend .greenery-poly {\r\n  width: 14px !important; height: 12px !important; background-color: rgba(34, 197, 94, 0.5) !important;\r\n  border: 1.5px solid #15803d !important; border-radius: 2px !important; display: inline-block !important;\n}\n.custom-map-legend .water-poly {\r\n  width: 14px !important; height: 12px !important; background-color: rgba(2, 132, 199, 0.6) !important;\r\n  border: 1.5px solid #0369a1 !important; border-radius: 2px !important; display: inline-block !important;\n}\r\n\r\n/* BASEMAP CONTROL STYLING */\n.leaflet-control-layers-base label {\r\n  display: flex !important; align-items: center !important; gap: 6px !important;\r\n  font-size: 12px !important; font-weight: 700 !important; color: #0f172a !important;\r\n  cursor: pointer !important; padding: 3px 0 !important;\n}\n.leaflet-control-layers {\r\n  border-radius: 8px !important;\r\n  box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;\r\n  border: 1px solid #cbd5e1 !important;\n}\r\n", ""]);
+___CSS_LOADER_EXPORT___.push([module.id, "\r\n/* 🌟 TOÀN BỘ CSS GLOBAL CHO CONTROL BẢN ĐỒ DƯỚI ĐÁY CÓ PADDING SAFE-AREA CHO IPHONE */\n.leaflet-bottom.leaflet-left {\r\n  z-index: 999 !important;\r\n  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;\r\n  margin-left: 12px !important;\n}\n.leaflet-bottom.leaflet-right {\r\n  z-index: 999 !important;\r\n  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;\r\n  margin-right: 12px !important;\n}\n.custom-map-legend {\r\n  background: rgba(255, 255, 255, 0.95) !important;\r\n  backdrop-filter: blur(6px) !important;\r\n  padding: 8px 12px !important;\r\n  border-radius: 8px !important;\r\n  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;\r\n  border: 1px solid #cbd5e1 !important;\r\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif !important;\r\n  min-width: 140px !important;\r\n  display: block !important;\r\n  visibility: visible !important;\n}\n.custom-map-legend .legend-header {\r\n  font-size: 10px !important;\r\n  font-weight: 800 !important;\r\n  color: #0f172a !important;\r\n  margin-bottom: 6px !important;\r\n  border-bottom: 1px solid #e2e8f0 !important;\r\n  padding-bottom: 4px !important;\r\n  letter-spacing: 0.5px !important;\r\n  text-transform: uppercase !important;\n}\n.custom-map-legend .legend-list {\r\n  display: flex !important;\r\n  flex-direction: column !important;\r\n  gap: 5px !important;\n}\n.custom-map-legend .legend-item {\r\n  display: flex !important;\r\n  align-items: center !important;\r\n  gap: 6px !important;\n}\n.custom-map-legend .legend-text {\r\n  font-size: 10px !important;\r\n  font-weight: 600 !important;\r\n  color: #334155 !important;\n}\n.custom-map-legend .rainwater-point {\r\n  width: 10px !important; height: 10px !important; border-radius: 50% !important;\r\n  background-color: #007bff !important; border: 2px solid #ffffff !important;\r\n  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;\n}\n.custom-map-legend .wastewater-point {\r\n  width: 10px !important; height: 10px !important; border-radius: 50% !important;\r\n  background-color: #800080 !important; border: 2px solid #ffffff !important;\r\n  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;\n}\r\n\r\n/* BASEMAP CONTROL STYLING */\n.leaflet-control-layers-base label {\r\n  display: flex !important; align-items: center !important; gap: 6px !important;\r\n  font-size: 12px !important; font-weight: 700 !important; color: #0f172a !important;\r\n  cursor: pointer !important; padding: 3px 0 !important;\n}\n.leaflet-control-layers {\r\n  border-radius: 8px !important;\r\n  box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;\r\n  border: 1px solid #cbd5e1 !important;\n}\r\n", ""]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 

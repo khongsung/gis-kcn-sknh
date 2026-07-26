@@ -344,7 +344,7 @@ export default {
 /* KHUNG CHÍNH CĂN GIỮA TIÊU CHUẨN ĐỘ RỘNG WEB (MAX-WIDTH: 1140PX) */
 .contact-page {
   background-color: #f8fafc;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding-bottom: 60px;
 }
 

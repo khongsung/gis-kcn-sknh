@@ -96,7 +96,6 @@ export default {
       waterGeoJsonLayer: null,
       currentLocationMarker: null,
 
-      // Mảng lưu vết các nhãn Turf.js để ẩn/hiện khi zoom
       greeneryLabelMarkers: [],
       waterLabelMarkers: []
     };
@@ -106,19 +105,15 @@ export default {
   },
   methods: {
     initMap() {
-      // 1. KHỞI TẠO BẢN ĐỒ VỚI CANVAS RENDERER MẶC ĐỊNH DUY NHẤT
       this.map = L.map('map', {
         zoomControl: false,
-        preferCanvas: true,        // Render mượt trên 1 Canvas chung
+        preferCanvas: true,
         wheelDebounceTime: 40,
         wheelPxPerZoomLevel: 80
       }).setView([21.246624, 106.178020], 16);
 
       L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
-      // =========================================================================
-      // 🌟 KHỞI TẠO NỀN BẢN ĐỒ (BASEMAPS)
-      // =========================================================================
       const tileOptions = {
         maxZoom: 20,
         maxNativeZoom: 19,
@@ -156,23 +151,19 @@ export default {
         collapsed: true
       }).addTo(this.map);
 
-      // 2. THÊM BẢNG CHÚ THÍCH CỐ ĐỊNH VÀO GÓC DƯỚI BÊN TRÁI
       this.addMapLegend();
 
-      // 3. LẮNG NGHE SỰ KIỆN ZOOM
       this.map.on('zoomend', () => {
         this.checkAllLabelsVisibility();
       });
 
-      // 4. VẼ CÁC LỚP DỮ LIỆU THEO ĐÚNG THỨ TỰ TỪ DƯỚI LÊN TRÊN
-      // (Thứ tự vẽ quyết định đè hình trên Canvas, giúp bắt click chính xác 100%)
-      this.drawPlots();       // 1. Lô đất (Lớp nền đáy)
-      this.drawGreenery();    // 2. Cây xanh (Nằm trên đất)
-      this.drawWaterBodies(); // 3. Mặt nước (Nằm trên cây xanh/đất)
-      this.drawRoads();       // 4. Đường giao thông
-      this.drawFactories();   // 5. Nhà xưởng (Nằm trên lớp đất/xanh)
-      this.drawWastewater();  // 6. Hố ga nước thải (Lớp điểm đỉnh)
-      this.drawRainwater();   // 7. Hố ga nước mưa (Lớp điểm đỉnh)
+      this.drawPlots();
+      this.drawGreenery();
+      this.drawWaterBodies();
+      this.drawRoads();
+      this.drawFactories();
+      this.drawWastewater();
+      this.drawRainwater();
 
       this.bringManholesToFront();
       this.checkAllLabelsVisibility();
@@ -183,7 +174,6 @@ export default {
       if (leafletLayers.rainwater) leafletLayers.rainwater.bringToFront();
     },
 
-    // 🗺️ 1. HÀM VẼ LÔ ĐẤT KCN
     drawPlots() {
       if (!this.plotsData || !this.plotsData.features.length) return;
 
@@ -224,7 +214,6 @@ export default {
       this.plotsGeoJsonLayer = leafletLayers.plots;
     },
 
-    // 🌳 2. HÀM VẼ LỚP CÂY XANH / THẢM CỎ
     drawGreenery() {
       if (!this.greeneryData || !this.greeneryData.features) return;
       this.greeneryLabelMarkers = [];
@@ -255,7 +244,6 @@ export default {
       this.greeneryGeoJsonLayer = leafletLayers.greenery;
     },
 
-    // 🌊 3. HÀM VẼ LỚP MẶT NƯỚC / HỒ ĐIỀU HÒA
     drawWaterBodies() {
       if (!this.waterBodiesData || !this.waterBodiesData.features) return;
       this.waterLabelMarkers = [];
@@ -286,7 +274,6 @@ export default {
       this.waterGeoJsonLayer = leafletLayers.waterBodies;
     },
 
-    // 🛣️ 4. HÀM VẼ ĐƯỜNG GIAO THÔNG
     drawRoads() {
       if (!this.roadsData || !this.roadsData.features.length) return;
 
@@ -314,7 +301,6 @@ export default {
       this.roadsGeoJsonLayer = leafletLayers.roads;
     },
 
-    // 🏭 5. HÀM VẼ LỚP NHÀ XƯỞNG
     drawFactories() {
       if (!this.factoriesData || !this.factoriesData.features) return;
 
@@ -322,8 +308,6 @@ export default {
         interactive: true,
         style: (feature) => {
           const p = feature.properties;
-          
-          // Nếu xưởng đã cho thuê và công ty có màu riêng
           if (p.status === 'rented' && (p.company_color || p.color)) {
             const customColor = p.company_color || p.color;
             return {
@@ -333,8 +317,6 @@ export default {
               weight: 2
             };
           }
-
-          // Xưởng còn trống hoặc chưa chọn màu -> dùng màu trạng thái mặc định
           return this.getPolygonStyle(p.status, 0.6);
         },
         onEachFeature: (feature, layer) => {
@@ -351,19 +333,14 @@ export default {
             });
           }
 
-          // Click chọn xưởng -> Mở Panel thông tin doanh nghiệp
           layer.on('click', (e) => {
-            L.DomEvent.stopPropagation(e); // Ngắt truyền sự kiện để mở đúng Panel xưởng
+            L.DomEvent.stopPropagation(e);
             this.selectedFactory = p; 
           });
 
           layer.on({
-            mouseover: (e) => {
-              e.target.setStyle({ fillOpacity: 0.8, weight: 3 });
-            },
-            mouseout: (e) => {
-              e.target.setStyle({ fillOpacity: 0.6, weight: 2 });
-            }
+            mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.8, weight: 3 }); },
+            mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.6, weight: 2 }); }
           });
         }
       }).addTo(this.map);
@@ -371,7 +348,6 @@ export default {
       this.factoriesGeoJsonLayer = leafletLayers.factories;
     },
 
-    // 🧪 6. HÀM VẼ HỐ GA NƯỚC THẢI
     drawWastewater() {
       if (!this.wastewaterManholesData || !this.wastewaterManholesData.features) return;
 
@@ -382,7 +358,7 @@ export default {
             radius: 7,
             fillColor: '#800080',
             color: '#ffffff',
-            weight: 1.5,
+            weight: 1,
             opacity: 0.9,
             fillOpacity: 0.9
           });
@@ -408,7 +384,6 @@ export default {
       }).addTo(this.map);
     },
 
-    // 🌧️ 7. HÀM VẼ HỐ GA NƯỚC MƯA
     drawRainwater() {
       if (!this.rainwaterManholesData || !this.rainwaterManholesData.features) return;
 
@@ -419,7 +394,7 @@ export default {
             radius: 6,
             fillColor: '#007bff',
             color: '#ffffff',
-            weight: 1.5,
+            weight: 1,
             opacity: 0.9,
             fillOpacity: 0.9
           });
@@ -445,7 +420,6 @@ export default {
       }).addTo(this.map);
     },
 
-    // 📌 BẢNG CHÚ THÍCH CỐ ĐỊNH GÓC DƯỚI BÊN TRÁI
     addMapLegend() {
       const legend = L.control({ position: 'bottomleft' });
 
@@ -474,12 +448,10 @@ export default {
       legend.addTo(this.map);
     },
 
-    // 🌟 HÀM TỔNG ẨN/HIỆN TẤT CẢ NHÃN KHI ZOOM
     checkAllLabelsVisibility() {
       if (!this.map) return;
       const currentZoom = this.map.getZoom();
 
-      // 1. Layer GeoJSON chuẩn
       const layersToCheck = [
         { layer: this.roadsGeoJsonLayer, minZoom: 16 },
         { layer: this.plotsGeoJsonLayer, minZoom: 16 },
@@ -500,7 +472,6 @@ export default {
       const MIN_ZOOM = 16;
       const show = currentZoom >= MIN_ZOOM;
 
-      // 2. Nhãn Turf Cây xanh
       this.greeneryLabelMarkers.forEach(marker => {
         if (marker && marker.getTooltip()) {
           if (show) marker.openTooltip();
@@ -508,7 +479,6 @@ export default {
         }
       });
 
-      // 3. Nhãn Turf Mặt nước
       this.waterLabelMarkers.forEach(marker => {
         if (marker && marker.getTooltip()) {
           if (show) marker.openTooltip();
@@ -517,7 +487,6 @@ export default {
       });
     },
 
-    // 🌟 CẬP NHẬT TRẠNG THÁI BẬT/TẮT & ĐỘ MỜ TỪ SIDEBAR CONTROL
     handleLayerChange({ name, config }) {
       const layer = leafletLayers[name];
       if (!layer) return;
@@ -561,7 +530,6 @@ export default {
       return 'Đang xây dựng';
     },
 
-    // 🎯 ĐỊNH VỊ VỊ TRÍ GPS CỦA NGƯỜI DÙNG
     getCurrentLocation() {
       if (!navigator.geolocation) {
         alert("Trình duyệt của anh không hỗ trợ tính năng định vị GPS.");
@@ -601,7 +569,6 @@ export default {
       );
     },
 
-    // 🌟 HELPER METHOD: TÍNH TỌA ĐỘ TRỌNG TÂM LÒNG & GẮN NHÃN BẰNG TURF.JS
     addPolygonLabel(feature, labelText, cssClass) {
       if (!feature || !feature.geometry || !labelText) return null;
 
@@ -610,7 +577,6 @@ export default {
         const lat = pt.geometry.coordinates[1];
         const lng = pt.geometry.coordinates[0];
 
-        // 🌟 interactive: false GIÚP NHÃN KHÔNG BỊ HÚT CLICK CỦA HÌNH ĐA GIÁC BÊN DƯỚI
         const labelMarker = L.circleMarker([lat, lng], {
           interactive: false,
           radius: 0,
@@ -649,6 +615,7 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* Co giãn chuẩn theo thanh trình duyệt di động */
   width: 100vw;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -657,7 +624,6 @@ export default {
 .webgis-content {
   display: flex;
   flex: 1;
-  height: calc(100vh - 60px);
   position: relative;
   overflow: hidden;
 }
@@ -665,6 +631,7 @@ export default {
 .map-container {
   flex: 1;
   height: 100%;
+  width: 100%;
   z-index: 1;
 }
 
@@ -673,7 +640,7 @@ export default {
   top: 20px;
   right: 20px;
   width: 320px;
-  max-height: calc(100vh - 100px);
+  max-height: calc(100dvh - 100px);
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.2);
@@ -691,13 +658,14 @@ export default {
 .badge.under_construction { background-color: #ffc107; color: #000; }
 .phone-link { color: #0d6efd; text-decoration: none; font-weight: bold; }
 
+/* 🎯 NÚT ĐỊNH VỊ CÓ TÍNH TỚI VÙNG AN TOÀN SAFE-AREA */
 .locate-btn {
   position: absolute;
-  bottom: 97px;
-  right: 8px;
+  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  right: 12px;
   z-index: 1000;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   background: #ffffff;
   border: 2px solid rgba(0, 0, 0, 0.2);
   border-radius: 50%;
@@ -706,7 +674,7 @@ export default {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
 }
 
@@ -723,6 +691,8 @@ export default {
     max-height: 60vh;
     border-radius: 16px 16px 0 0;
     box-sizing: border-box;
+    /* Dán padding-bottom cẩn thận để không bị thanh Home Indicator che */
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -759,7 +729,7 @@ export default {
   background-color: rgba(255, 255, 255, 0.9) !important; color: #15803d !important;
   font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;
   border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;
-  pointer-events: none !important; /* Xuyên chuột qua nhãn tên */
+  pointer-events: none !important;
 }
 :deep(.greenery-label::before) { display: none !important; }
 
@@ -767,7 +737,7 @@ export default {
   background-color: rgba(255, 255, 255, 0.9) !important; color: #0369a1 !important;
   font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;
   border-radius: 4px !important; border: 1px solid #0284c7 !important; white-space: nowrap !important;
-  pointer-events: none !important; /* Xuyên chuột qua nhãn tên */
+  pointer-events: none !important;
 }
 :deep(.water-label::before) { display: none !important; }
 
@@ -775,7 +745,7 @@ export default {
   background-color: rgba(255, 255, 255, 0.9) !important; color: #166534 !important;
   font-weight: 700 !important; font-size: 11px !important; padding: 2px 6px !important;
   border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;
-  pointer-events: none !important; /* Xuyên chuột qua nhãn tên */
+  pointer-events: none !important;
 }
 :deep(.factory-label::before) { display: none !important; }
 
@@ -809,31 +779,37 @@ export default {
 </style>
 
 <style>
-/* STYLE GLOBAL CHO LEAFLET CONTROLS & BẢNG CHÚ THÍCH */
+/* 🌟 TOÀN BỘ CSS GLOBAL CHO CONTROL BẢN ĐỒ DƯỚI ĐÁY CÓ PADDING SAFE-AREA CHO IPHONE */
 .leaflet-bottom.leaflet-left {
   z-index: 999 !important;
-  margin-bottom: 20px !important;
-  margin-left: 15px !important;
+  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
+  margin-left: 12px !important;
+}
+
+.leaflet-bottom.leaflet-right {
+  z-index: 999 !important;
+  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
+  margin-right: 12px !important;
 }
 
 .custom-map-legend {
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(6px) !important;
-  padding: 10px 14px !important;
+  padding: 8px 12px !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
   border: 1px solid #cbd5e1 !important;
-  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
-  min-width: 160px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  min-width: 140px !important;
   display: block !important;
   visibility: visible !important;
 }
 
 .custom-map-legend .legend-header {
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 800 !important;
   color: #0f172a !important;
-  margin-bottom: 8px !important;
+  margin-bottom: 6px !important;
   border-bottom: 1px solid #e2e8f0 !important;
   padding-bottom: 4px !important;
   letter-spacing: 0.5px !important;
@@ -843,13 +819,13 @@ export default {
 .custom-map-legend .legend-list {
   display: flex !important;
   flex-direction: column !important;
-  gap: 6px !important;
+  gap: 5px !important;
 }
 
 .custom-map-legend .legend-item {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 6px !important;
 }
 
 .custom-map-legend .legend-text {
@@ -859,30 +835,15 @@ export default {
 }
 
 .custom-map-legend .rainwater-point {
-  width: 12px !important; height: 12px !important; border-radius: 50% !important;
+  width: 10px !important; height: 10px !important; border-radius: 50% !important;
   background-color: #007bff !important; border: 2px solid #ffffff !important;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;
 }
 
 .custom-map-legend .wastewater-point {
-  width: 12px !important; height: 12px !important; border-radius: 50% !important;
+  width: 10px !important; height: 10px !important; border-radius: 50% !important;
   background-color: #800080 !important; border: 2px solid #ffffff !important;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;
-}
-
-.custom-map-legend .road-line {
-  width: 16px !important; height: 4px !important; background-color: #FFE082 !important;
-  border-radius: 2px !important; display: inline-block !important;
-}
-
-.custom-map-legend .greenery-poly {
-  width: 14px !important; height: 12px !important; background-color: rgba(34, 197, 94, 0.5) !important;
-  border: 1.5px solid #15803d !important; border-radius: 2px !important; display: inline-block !important;
-}
-
-.custom-map-legend .water-poly {
-  width: 14px !important; height: 12px !important; background-color: rgba(2, 132, 199, 0.6) !important;
-  border: 1.5px solid #0369a1 !important; border-radius: 2px !important; display: inline-block !important;
 }
 
 /* BASEMAP CONTROL STYLING */

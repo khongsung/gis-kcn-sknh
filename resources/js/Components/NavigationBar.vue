@@ -42,26 +42,6 @@
           <span class="nav-label">Trang chủ (Map)</span>
         </Link>
 
-        <!-- <Link 
-          href="/doanh-nghiep" 
-          class="nav-link" 
-          :class="{ active: currentPath.startsWith('/doanh-nghiep') }"
-          @click="isMobileMenuOpen = false"
-        >
-          <span class="nav-icon">🏢</span>
-          <span class="nav-label">Doanh nghiệp</span>
-        </Link>
-
-        <Link 
-          href="/tuyen-dung" 
-          class="nav-link" 
-          :class="{ active: currentPath.startsWith('/tuyen-dung') }"
-          @click="isMobileMenuOpen = false"
-        >
-          <span class="nav-icon">💼</span>
-          <span class="nav-label">Tuyển dụng</span>
-        </Link> -->
-
         <Link 
           href="/contact" 
           class="nav-link" 
@@ -71,24 +51,11 @@
           <span class="nav-icon">🌟</span>
           <span class="nav-label">Liên hệ Chủ đầu tư</span>
         </Link>
-
-        <!-- MENU TRẠM XỬ LÝ (CHỈ ADMIN THẤY) -->
-        <!-- <Link 
-          v-if="isAdmin" 
-          href="/tram-xu-ly" 
-          class="nav-link admin-link" 
-          :class="{ active: currentPath.startsWith('/tram-xu-ly') }"
-          @click="isMobileMenuOpen = false"
-        >
-          <span class="nav-icon">🧪</span>
-          <span class="nav-label">Trạm xử lý nước thải</span>
-          <span class="badge-admin">Admin</span>
-        </Link> -->
       </nav>
 
       <!-- 3. KHUNG USER / ĐĂNG NHẬP (BÊN PHẢI CÙNG) -->
       <div class="nav-auth">
-        <!-- ĐÃ ĐĂNG NHẬP: HIỆN AVATAR, TÊN VÀ NÚT DASHBOARD / LỐT ĐĂNG XUẤT -->
+        <!-- ĐÃ ĐĂNG NHẬP -->
         <template v-if="currentUser">
           <div class="user-profile-wrapper">
             <Link href="/admin/dashboard" class="user-profile-link" title="Truy cập Trang quản trị Admin">
@@ -103,7 +70,6 @@
               </div>
             </Link>
 
-            <!-- NÚT ĐĂNG XUẤT TÁCH BIỆT TRÁNH NHẦM SỰ KIỆN CLICK -->
             <button @click.prevent="logout" class="logout-btn" title="Đăng xuất khỏi hệ thống">
               🚪
             </button>
@@ -134,17 +100,14 @@ export default {
     };
   },
   computed: {
-    // 🌟 Lấy đường dẫn URL hiện tại mượt mà từ Inertia $page
     currentPath() {
       return this.$page?.url || window.location.pathname;
     },
 
-    // Lấy thông tin User đăng nhập từ Inertia Share props
     currentUser() {
       return this.$page?.props?.auth?.user || null;
     },
 
-    // Kiểm tra quyền Admin
     isAdmin() {
       return this.currentUser && this.currentUser.role === 'admin';
     }
@@ -154,7 +117,6 @@ export default {
       this.imageError = true;
     },
 
-    // 🌟 Hàm xử lý đăng xuất an toàn
     logout() {
       if (confirm('Anh có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
         this.$inertia.post('/logout');
@@ -175,6 +137,8 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
+  /* Thêm safe-area cho phần tai thỏ / notch nếu có */
+  padding-top: env(safe-area-inset-top, 0px); 
   box-sizing: border-box;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   z-index: 2000;
@@ -294,15 +258,16 @@ export default {
 }
 
 .login-btn {
-  padding: 7px 16px;
+  padding: 10px 16px;
   background: #2563eb;
   color: #ffffff;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: background 0.2s;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .login-btn:hover {
@@ -380,7 +345,7 @@ export default {
   transform: scale(1.05);
 }
 
-/* RESPONSIVE MOBILE */
+/* RESPONSIVE MOBILE (XỬ LÝ DÀNH RIÊNG CHO IPHONE / SAFARI) */
 @media (max-width: 992px) {
   .hamburger-btn {
     display: flex;
@@ -413,17 +378,21 @@ export default {
     top: 0;
     right: -280px;
     width: 260px;
+    /* 🌟 FIX 1: Chuyển 100vh sang 100dvh để tự co giãn theo thanh trình duyệt di động */
     height: 100vh;
+    height: 100dvh; 
     background: #0f172a;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
     margin-left: 0;
-    padding: 70px 16px 20px 16px;
+    /* 🌟 FIX 2: Thêm pb (padding-bottom) có tính Safe Area cho mép dưới iPhone */
+    padding: 70px 16px calc(24px + env(safe-area-inset-bottom, 0px)) 16px;
     box-sizing: border-box;
     transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     z-index: 2001;
     box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+    overflow-y: auto; /* Cho phép cuộn nếu màn hình quá ngắn */
   }
 
   .nav-content.mobile-open {
@@ -433,15 +402,22 @@ export default {
   .nav-menu {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 12px;
     margin-bottom: 20px;
+  }
+
+  .nav-link {
+    padding: 10px 14px;
+    font-size: 14px;
   }
 
   .nav-auth {
     margin-left: 0;
     margin-top: auto;
-    padding-top: 15px;
+    padding-top: 20px;
     border-top: 1px solid #1e293b;
+    /* 🌟 FIX 3: Khoảng cách an toàn bổ sung ở chân Menu */
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .user-profile-wrapper {
@@ -453,6 +429,8 @@ export default {
   .login-btn {
     text-align: center;
     width: 100%;
+    display: block;
+    padding: 12px 16px; /* Làm nút to ra hơn một chút để dễ bấm trên điện thoại */
   }
 }
 </style>
