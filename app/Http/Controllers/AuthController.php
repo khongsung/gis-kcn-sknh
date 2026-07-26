@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException; // 👈 1. Import ValidationException
 use Inertia\Inertia;
 
 class AuthController extends Controller
@@ -35,7 +36,11 @@ class AuthController extends Controller
             // Kiểm tra tài khoản có bị block không
             if ($user->is_blocked) {
                 Auth::logout();
-                return back()->withErrors(['email' => 'Tài khoản này đã bị khóa. Vui lòng liên hệ Admin KCN.']);
+                
+                // 🌟 Nâng cấp: Ném ngoại lệ Validation chuẩn cho Inertia
+                throw ValidationException::withMessages([
+                    'email' => 'Tài khoản này đã bị khóa. Vui lòng liên hệ Admin KCN.',
+                ]);
             }
 
             $request->session()->regenerate();
@@ -48,7 +53,8 @@ class AuthController extends Controller
             }
         }
 
-        return back()->withErrors([
+        // 🌟 Nâng cấp: Ném ngoại lệ khi sai Email/Mật khẩu (Tránh 419 Page Expired)
+        throw ValidationException::withMessages([
             'email' => 'Email hoặc mật khẩu không chính xác.',
         ]);
     }

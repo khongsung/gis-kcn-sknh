@@ -105,12 +105,19 @@ export default {
   },
   methods: {
     initMap() {
-      this.map = L.map('map', {
+      const isMobile = window.innerWidth <= 768; // Kiểm tra nếu là điện thoại/màn hình nhỏ
+  
+      // Màn hình điện thoại zoom nhỏ xuống 15 (hoặc 14.5), máy tính giữ nguyên 16
+      const initialZoom = isMobile ? 15 : 16; 
+      
+      // Tọa độ tâm bản đồ KCN Song Khê - Nội Hoàng
+      const initialCenter = [21.246624, 106.178020];
+          this.map = L.map('map', {
         zoomControl: false,
         preferCanvas: true,
         wheelDebounceTime: 40,
         wheelPxPerZoomLevel: 80
-      }).setView([21.246624, 106.178020], 16);
+      }).setView(initialCenter, initialZoom);
 
       L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
@@ -661,8 +668,8 @@ export default {
 /* 🎯 NÚT ĐỊNH VỊ CÓ TÍNH TỚI VÙNG AN TOÀN SAFE-AREA */
 .locate-btn {
   position: absolute;
-  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
-  right: 12px;
+  bottom: calc(105px + env(safe-area-inset-bottom, 0px));
+  right: 18px;
   z-index: 1000;
   width: 42px;
   height: 42px;
@@ -676,6 +683,9 @@ export default {
   cursor: pointer;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
+}
+:deep(.leaflet-control-attribution){
+  display: none;
 }
 
 .locate-btn:hover { background: #f4f4f4; transform: scale(1.05); }

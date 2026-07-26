@@ -308,8 +308,8 @@ export default {
     display: flex;
     align-items: center;
     position: absolute;
-    top: 72px;
-    left: 12px;
+    top: 18px;
+    left: 18px;
     z-index: 1001;
     background: #0f172a;
     color: #38bdf8;
