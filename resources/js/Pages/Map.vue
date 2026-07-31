@@ -204,7 +204,7 @@ export default {
           }
 
           layer.bindPopup(`
-            <div style="font-family: sans-serif; font-size: 13px; min-width: 180px;">
+            <div style="font-family: sans-serif; font-size: 8px; min-width: 180px;">
               <h4 style="margin: 0 0 6px 0; color: #b45309;">🗺️ Lô đất: ${p.code}</h4>
               <p style="margin: 3px 0;"><b>Diện tích:</b> ${p.total_area ? Number(p.total_area).toLocaleString('vi-VN') + ' m²' : '—'}</p>
               <p style="margin: 3px 0;"><b>Mô tả / Trạng thái:</b> ${p.description || 'Chưa có thông tin'}</p>
@@ -239,7 +239,7 @@ export default {
             this.addPolygonLabel(feature, `🌳 ${p.code}`, 'greenery-label');
           }
           layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 170px;">
+            <div style="font-size: 8px; min-width: 170px;">
               <b style="color: #15803d;">🌳 Vùng Cây Xanh: ${p.code}</b><br>
               <b>Diện tích:</b> ${p.area ? Number(p.area).toLocaleString('vi-VN') + ' m²' : '—'}<br>
               <b>Mô tả:</b> ${p.description || 'Chưa cập nhật'}
@@ -269,7 +269,7 @@ export default {
             this.addPolygonLabel(feature, `🌊 ${p.code}`, 'water-label');
           }
           layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 170px;">
+            <div style="font-size: 8px; min-width: 170px;">
               <b style="color: #0284c7;">🌊 Mặt Nước / Hồ: ${p.code}</b><br>
               <b>Diện tích:</b> ${p.area ? Number(p.area).toLocaleString('vi-VN') + ' m²' : '—'}<br>
               <b>Ghi chú:</b> ${p.description || 'Chưa cập nhật'}
@@ -350,7 +350,7 @@ export default {
             mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.6, weight: 2 }); }
           });
         }
-      }).addTo(this.map);
+      });
 
       this.factoriesGeoJsonLayer = leafletLayers.factories;
     },
@@ -388,7 +388,7 @@ export default {
             </div>
           `);
         }
-      }).addTo(this.map);
+      });
     },
 
     drawRainwater() {
@@ -424,7 +424,7 @@ export default {
             </div>
           `);
         }
-      }).addTo(this.map);
+      });
     },
 
     addMapLegend() {
@@ -460,14 +460,14 @@ export default {
       const currentZoom = this.map.getZoom();
 
       const layersToCheck = [
-        { layer: this.roadsGeoJsonLayer, minZoom: 16 },
-        { layer: this.plotsGeoJsonLayer, minZoom: 16 },
-        { layer: this.factoriesGeoJsonLayer, minZoom: 18 }
+        { layer: this.roadsGeoJsonLayer, minZoom: 17, maxZoom: 20},
+        { layer: this.plotsGeoJsonLayer, minZoom: 17, maxZoom: 18},
+        { layer: this.factoriesGeoJsonLayer, minZoom: 18, maxZoom: 20}
       ];
 
       layersToCheck.forEach(item => {
         if (!item.layer) return;
-        const show = currentZoom >= item.minZoom;
+        const show = currentZoom >= item.minZoom && currentZoom < item.maxZoom;
         item.layer.eachLayer(l => {
           if (l.getTooltip()) {
             if (show) l.openTooltip();
@@ -476,7 +476,7 @@ export default {
         });
       });
 
-      const MIN_ZOOM = 16;
+      const MIN_ZOOM = 17;
       const show = currentZoom >= MIN_ZOOM;
 
       this.greeneryLabelMarkers.forEach(marker => {
@@ -502,9 +502,28 @@ export default {
         if (!this.map.hasLayer(layer)) {
           this.map.addLayer(layer);
         }
+        console.log(config);
+        if (config.name === "greenery") {
+          this.greeneryLabelMarkers.forEach(marker => {
+            marker.openTooltip();
+          });
+        } else if (config.name === "waterBodies") {
+          this.waterLabelMarkers.forEach(marker => {
+            marker.openTooltip();
+          });
+        }
       } else {
         if (this.map.hasLayer(layer)) {
           this.map.removeLayer(layer);
+        }
+        if (config.name === "greenery") {
+          this.greeneryLabelMarkers.forEach(marker => {
+            marker.closeTooltip();
+          });
+        } else if (config.name === "waterBodies") {
+          this.waterLabelMarkers.forEach(marker => {
+            marker.closeTooltip();
+          });
         }
         return;
       }
@@ -519,6 +538,7 @@ export default {
       });
 
       this.bringManholesToFront();
+      this.checkAllLabelsVisibility();
     },
 
     getPolygonStyle(status, opacity = 0.6) {
@@ -752,7 +772,7 @@ export default {
 
 :deep(.factory-label) {
   background-color: rgba(255, 255, 255, 0.9) !important; color: #166534 !important;
-  font-weight: 700 !important; font-size: 11px !important; padding: 2px 6px !important;
+  font-weight: 700 !important; font-size: 8px !important; padding: 2px 6px !important;
   border-radius: 4px !important; border: 1px solid #22c55e !important; white-space: nowrap !important;
   pointer-events: none !important;
 }

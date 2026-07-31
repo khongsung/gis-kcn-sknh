@@ -28,7 +28,8 @@
               <b class="master-text">🌐 Tất cả các lớp</b>
             </label>
           </div>
-          <div class="opacity-control" v-if="masterLayer.visible">
+          <!-- <div class="opacity-control" v-if="masterLayer.visible"> -->
+          <div class="opacity-control">
             <div class="opacity-label">
               <span>Độ trong suốt chung</span>
               <b>{{ Math.round(masterLayer.opacity * 100) }}%</b>
@@ -69,7 +70,8 @@
             </label>
           </div>
 
-          <div class="opacity-control" v-if="layers[item.key].visible">
+          <!-- <div class="opacity-control" v-if="layers[item.key].visible"> -->
+          <div class="opacity-control">
             <div class="opacity-label">
               <span>Độ rõ hiển thị</span>
               <b>{{ Math.round(layers[item.key].opacity * 100) }}%</b>
@@ -105,23 +107,23 @@ export default {
       // Danh mục hiển thị và màu sắc nhận diện các Layer
       layerConfig: [
         { key: 'plots', label: 'Lô đất quy hoạch', icon: '🏢', badgeColor: '#b45309', textColor: '#b45309' },
-        { key: 'factories', label: 'Nhà xưởng KCN', icon: '🏭', badgeColor: '#166534', textColor: '#166534' },
-        { key: 'wastewater', label: 'Hố ga Nước thải', icon: '🧪', badgeColor: '#800080', textColor: '#800080' },
-        { key: 'rainwater', label: 'Hố ga Nước mưa', icon: '🌧️', badgeColor: '#0284c7', textColor: '#0284c7' },
         { key: 'roads', label: 'Đường giao thông', icon: '🛣️', badgeColor: '#f59e0b', textColor: '#d97706' },
         { key: 'greenery', label: 'Cây xanh & Thảm cỏ', icon: '🌳', badgeColor: '#16a34a', textColor: '#15803d' },
-        { key: 'waterBodies', label: 'Mặt nước & Hồ điều hòa', icon: '🌊', badgeColor: '#0284c7', textColor: '#0369a1' }
+        { key: 'waterBodies', label: 'Mặt nước & Hồ điều hòa', icon: '🌊', badgeColor: '#0284c7', textColor: '#0369a1' },
+        { key: 'factories', label: 'Nhà xưởng KCN', icon: '🏭', badgeColor: '#166534', textColor: '#166534' },
+        { key: 'wastewater', label: 'Hố ga Nước thải', icon: '🧪', badgeColor: '#800080', textColor: '#800080' },
+        { key: 'rainwater', label: 'Hố ga Nước mưa', icon: '🌧️', badgeColor: '#0284c7', textColor: '#0284c7' }
       ],
 
       // Trạng thái Bật/Tắt và Độ rõ (Opacity) mặc định
       layers: {
-        plots: { visible: true, opacity: 0.35 },
-        factories: { visible: true, opacity: 0.6 },
-        wastewater: { visible: true, opacity: 0.9 },
-        rainwater: { visible: true, opacity: 0.9 },
+        plots: { visible: true, opacity: 0.4 },
         roads: { visible: true, opacity: 0.85 },
-        greenery: { visible: true, opacity: 0.5 },    
-        waterBodies: { visible: true, opacity: 0.6 }
+        greenery: { visible: true, opacity: 0.5, name: "greenery"},    
+        waterBodies: { visible: true, opacity: 0.6, name: "waterBodies"},
+        rainwater: { visible: false, opacity: 0.9 },
+        factories: { visible: false, opacity: 0.6 },
+        wastewater: { visible: false, opacity: 0.9 }
       }
     };
   },
