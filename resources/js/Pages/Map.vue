@@ -239,7 +239,7 @@ export default {
             this.addPolygonLabel(feature, `🌳 ${p.code}`, 'greenery-label');
           }
           layer.bindPopup(`
-            <div style="font-size: 8px; min-width: 170px;">
+            <div style="font-size: 13px; min-width: 170px;">
               <b style="color: #15803d;">🌳 Vùng Cây Xanh: ${p.code}</b><br>
               <b>Diện tích:</b> ${p.area ? Number(p.area).toLocaleString('vi-VN') + ' m²' : '—'}<br>
               <b>Mô tả:</b> ${p.description || 'Chưa cập nhật'}
@@ -269,7 +269,7 @@ export default {
             this.addPolygonLabel(feature, `🌊 ${p.code}`, 'water-label');
           }
           layer.bindPopup(`
-            <div style="font-size: 8px; min-width: 170px;">
+            <div style="font-size: 13px; min-width: 170px;">
               <b style="color: #0284c7;">🌊 Mặt Nước / Hồ: ${p.code}</b><br>
               <b>Diện tích:</b> ${p.area ? Number(p.area).toLocaleString('vi-VN') + ' m²' : '—'}<br>
               <b>Ghi chú:</b> ${p.description || 'Chưa cập nhật'}
