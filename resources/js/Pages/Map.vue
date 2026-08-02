@@ -189,7 +189,7 @@ export default {
         style: () => ({
           fillColor: '#b45309',
           fillOpacity: 0.35,
-          color: '#b45309',
+          color: '#f55b02',
           weight: 2,
           dashArray: '4, 4'
         }),
@@ -204,7 +204,7 @@ export default {
           }
 
           layer.bindPopup(`
-            <div style="font-family: sans-serif; font-size: 8px; min-width: 180px;">
+            <div style="font-family: sans-serif; font-size: 13px; min-width: 180px;">
               <h4 style="margin: 0 0 6px 0; color: #b45309;">🗺️ Lô đất: ${p.code}</h4>
               <p style="margin: 3px 0;"><b>Diện tích:</b> ${p.total_area ? Number(p.total_area).toLocaleString('vi-VN') + ' m²' : '—'}</p>
               <p style="margin: 3px 0;"><b>Mô tả / Trạng thái:</b> ${p.description || 'Chưa có thông tin'}</p>
@@ -213,7 +213,7 @@ export default {
 
           layer.on({
             mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.6, weight: 3 }); },
-            mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.35, weight: 2 }); }
+            mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.4, weight: 2 }); }
           });
         }
       }).addTo(this.map);
@@ -286,11 +286,15 @@ export default {
 
       leafletLayers.roads = L.geoJSON(this.roadsData, {
         interactive: true,
-        style: {
-          color: '#FFE082',
-          weight: 5,
-          opacity: 0.85,
-          fillOpacity: 0.85
+        style: (feature) => {
+          const widthInMeters = feature.properties.road_width || feature.properties.right_of_way || 10;
+          
+          return {
+            color: '#FFE082',
+            // 🌟 Tính weight theo mét thực tế từ Database
+            weight: this.getWeightInPixels(widthInMeters),
+            opacity: 0.85
+          };
         },
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
@@ -301,11 +305,41 @@ export default {
               className: 'street-name-sign'
             });
           }
-          layer.bindPopup(`<b>Đường: ${p.name}</b><br>Lộ giới: ${p.right_of_way || '—'}m`);
+          layer.bindPopup(`<b>Tên đường: ${p.name}</b><br>Rộng: ${p.road_width || p.right_of_way || '—'}m`);
         }
       }).addTo(this.map);
 
       this.roadsGeoJsonLayer = leafletLayers.roads;
+      // 🌟 Cập nhật lại nét vẽ mỗi khi phóng to / thu nhỏ bản đồ
+      this.map.off('zoomend', this.updateRoadsWidth); // Xóa event cũ tránh trùng lặp
+      this.map.on('zoomend', this.updateRoadsWidth);
+    },
+
+    getWeightInPixels(widthInMeters) {
+      if (!this.map || !widthInMeters) return 3; // Mặc định 3px nếu không có dữ liệu
+      
+      const zoom = this.map.getZoom();
+      const lat = this.map.getCenter().lat;
+      
+      // Tỉ lệ Mét/Pixel tại vĩ độ hiện tại
+      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+      
+      // Trả về số Pixel (đảm bảo tối thiểu 1.5px để không bị biến mất khi zoom xa)
+      return Math.max(1.5, widthInMeters / metersPerPixel);
+    },
+
+    // Hàm cập nhật nét vẽ khi Zoom
+    updateRoadsWidth() {
+      if (!this.roadsGeoJsonLayer) return;
+
+      this.roadsGeoJsonLayer.eachLayer((layer) => {
+        if (layer.feature && layer.setStyle) {
+          const widthInMeters = layer.feature.properties.road_width || layer.feature.properties.right_of_way || 10;
+          layer.setStyle({
+            weight: this.getWeightInPixels(widthInMeters)
+          });
+        }
+      });
     },
 
     drawFactories() {
