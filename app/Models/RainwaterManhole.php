@@ -22,9 +22,15 @@ class RainwaterManhole extends Model
         'elevation',
         'cover_material',
         'status',
+        'zone_id',
         'geom',
         'note',
     ];
+
+    public function zone()
+    {
+        return $this->belongsTo(IndustrialZone::class, 'zone_id');
+    }
 
     /**
      * Quan hệ N-1: Hố ga nước mưa thuộc về một Công ty

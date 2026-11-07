@@ -10,7 +10,7 @@
       <section class="page-banner">
         <span class="sub-title">CÔNG TY CP PHÁT TRIỂN HẠ TẦNG KCN BẮC GIANG</span>
         <h1 class="main-title">Khu Công Nghiệp Song Khê – Nội Hoàng</h1>
-        <p class="location-tag">📍 Lô HC, KCN Song Khê – Nội Hoàng (Phía Bắc), Phường Tiền Phong, Tỉnh Bắc Ninh</p>
+        <p class="location-tag">📍 Lô HC, KCN Song Khê – Nội Hoàng (Phía Bắc), Phường Tiền Phong, Thành phố Bắc Ninh</p>
       </section>
 
       <!-- ================================================================= -->
@@ -31,7 +31,7 @@
                 </tr>
                 <tr>
                   <td class="label-col">Địa chỉ:</td>
-                  <td class="value-col">Phường Tiền Phong, tỉnh Bắc Ninh.</td>
+                  <td class="value-col">Phường Tiền Phong, Thành phố Bắc Ninh.</td>
                 </tr>
                 <tr>
                   <td class="label-col">Chủ đầu tư:</td>
@@ -122,7 +122,7 @@
           <ol class="step-list">
             <li>Ký thỏa thuận thuê lại đất với Chủ đầu tư.</li>
             <li>Nộp tiền sử dụng/thuê đất theo quy định.</li>
-            <li>Đăng ký đầu tư tại Ban quản lý các KCN tỉnh Bắc Ninh; Đăng ký doanh nghiệp tại Sở Tài chính tỉnh Bắc Ninh.</li>
+            <li>Đăng ký đầu tư tại Ban quản lý các KCN Thành phố Bắc Ninh; Đăng ký doanh nghiệp tại Sở Tài chính Thành phố Bắc Ninh.</li>
           </ol>
         </div>
 
@@ -132,7 +132,7 @@
             <span class="icon">🏢</span>
             <div>
               <strong>Địa chỉ văn phòng:</strong>
-              <p>Lô HC, KCN Song Khê – Nội Hoàng (phía Bắc), phường Tiền Phong, tỉnh Bắc Ninh</p>
+              <p>Lô HC, KCN Song Khê – Nội Hoàng (phía Bắc), phường Tiền Phong, Thành phố Bắc Ninh</p>
             </div>
           </div>
 

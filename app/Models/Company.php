@@ -19,7 +19,13 @@ class Company extends Model
         'phone',
         'email',
         'description',
+        'zone_id',
     ];
+
+    public function zone()
+    {
+        return $this->belongsTo(IndustrialZone::class, 'zone_id');
+    }
 
     /**
      * Quan hệ 1-N: Một công ty có thể sở hữu nhiều Nhà xưởng

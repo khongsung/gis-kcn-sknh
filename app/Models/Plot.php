@@ -16,8 +16,17 @@ class Plot extends Model
         'code',
         'total_area',
         'description',
+        'zone_id',
         'geom',
     ];
+
+    /**
+     * Quan hệ với Khu công nghiệp
+     */
+    public function zone()
+    {
+        return $this->belongsTo(IndustrialZone::class, 'zone_id');
+    }
 
     /**
      * Quan hệ 1-N: Lô đất chứa nhiều Nhà xưởng
@@ -27,12 +36,16 @@ class Plot extends Model
         return $this->hasMany(Factory::class, 'plot_id');
     }
 
-    /**
-     * Quan hệ N-N: Lô đất liên kết với nhiều Công ty qua bảng trung gian company_plot
-     */
-    public function companies(): BelongsToMany
+    // Hoặc quan hệ xuyên bảng: Lấy các công ty thông qua factories
+    public function companies()
     {
-        return $this->belongsToMany(Company::class, 'company_plot', 'plot_id', 'company_id')
-                    ->withTimestamps();
+        return $this->hasManyThrough(
+            Company::class,
+            Factory::class,
+            'plot_id',    // Khóa ngoại trên bảng factories trỏ về plots
+            'id',         // Khóa chính trên bảng companies
+            'id',         // Khóa chính trên bảng plots
+            'company_id'  // Khóa ngoại trên bảng factories trỏ về companies
+        )->distinct();
     }
 }

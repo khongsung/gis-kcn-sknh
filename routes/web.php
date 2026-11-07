@@ -14,6 +14,13 @@ use App\Http\Controllers\Admin\WastewaterManholeController;
 use App\Http\Controllers\Admin\RoadController;
 use App\Http\Controllers\Admin\GreeneryController;
 use App\Http\Controllers\Admin\WaterBodyController;
+use App\Http\Controllers\Admin\IndustrialZoneBoundaryController;
+use App\Http\Controllers\Admin\LightingCabinetController;
+use App\Http\Controllers\Admin\LightingCableController;
+use App\Http\Controllers\Admin\LightingPoleController;
+use App\Http\Controllers\Admin\SurroundingLocationController;
+use App\Http\Controllers\Admin\IndustrialZoneController;
+
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -100,6 +107,25 @@ Route::middleware(['auth', \App\Http\Middleware\CheckAdminRole::class])->prefix(
     Route::post('/water-bodies', [WaterBodyController::class, 'store'])->name('admin.water-bodies.store');
     Route::put('/water-bodies/{id}', [WaterBodyController::class, 'update'])->name('admin.water-bodies.update');
     Route::delete('/water-bodies/{id}', [WaterBodyController::class, 'destroy'])->name('admin.water-bodies.destroy');
+
+    // Quản lý ranh giới quy hoạch KCN
+    Route::resource('boundaries', IndustrialZoneBoundaryController::class)->except(['create', 'show', 'edit']);
+
+
+    // Quản lý Tủ điện chiếu sáng
+    Route::resource('lighting-cabinets', LightingCabinetController::class)->except(['create', 'show', 'edit']);
+
+    // Quản lý cáp chiếu sáng 
+    Route::resource('lighting-cables', LightingCableController::class)->except(['create', 'show', 'edit']);
+
+    // Quản lý cột đèn
+    Route::resource('lighting-poles', LightingPoleController::class)->except(['create', 'show', 'edit']);
+
+    // Quản lý các vùng lân cận
+    Route::resource('surrounding-locations', SurroundingLocationController::class)->except(['create', 'show', 'edit']);
+
+    // Quản lý khu công nghiệp
+    Route::resource('industrial-zones', IndustrialZoneController::class)->except(['create', 'show', 'edit']);
 
 });
 

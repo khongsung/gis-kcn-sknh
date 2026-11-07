@@ -17,10 +17,15 @@ class PlotController extends Controller
     {
         $user = Auth::user();
 
-        // 🌟 Lấy danh sách Lô đất bằng Eloquent với Eager Loading quan hệ 'companies'
-        $plots = Plot::with(['companies' => function ($query) {
-                $query->select('companies.id', 'companies.name');
-            }])
+        // 🌟 Eager load factories cùng với company của xưởng đó
+        $plots = Plot::with([
+                'factories' => function ($query) {
+                    $query->select('id', 'plot_id', 'company_id', 'code');
+                },
+                'factories.company' => function ($query) {
+                    $query->select('id', 'name');
+                }
+            ])
             ->select(
                 'plots.*',
                 DB::raw('ST_AsGeoJSON(plots.geom) as geojson')
@@ -28,13 +33,23 @@ class PlotController extends Controller
             ->orderBy('plots.id', 'desc')
             ->get();
 
-        // Map thêm mảng company_ids để Vue render dễ dàng trên Form chọn
+        // 🌟 Gom nhóm công ty từ các factories trên từng lô đất
         $plots->transform(function ($plot) {
-            $plot->company_ids = $plot->companies->pluck('id')->toArray();
+            // Lấy danh sách companies duy nhất từ các xưởng thuộc lô đất
+            $companies = $plot->factories
+                ->pluck('company')
+                ->filter()         // Lọc bỏ null (nếu có xưởng trống chưa cho thuê)
+                ->unique('id')     // Loại bỏ trùng lặp nếu 1 công ty thuê nhiều xưởng trên 1 lô
+                ->values();
+
+            // Gán ngược lại vào thuộc tính companies và company_ids để Vue sử dụng mượt mà
+            $plot->companies = $companies;
+            $plot->company_ids = $companies->pluck('id')->toArray();
+
             return $plot;
         });
 
-        // Danh sách công ty cho dropdown select
+        // Danh sách tất cả công ty cho dropdown select
         $companies = Company::select('id', 'name')->orderBy('name', 'asc')->get();
 
         return Inertia::render('Admin/Plots/Index', [
@@ -58,7 +73,7 @@ class PlotController extends Controller
             'code'        => 'required|string|max:50|unique:plots,code',
             'area'        => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'geojson'     => 'nullable|string',
+            'geojson'     => 'nullable|string', 
             'company_ids' => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
         ]);
@@ -105,13 +120,6 @@ class PlotController extends Controller
             'geom'        => $geomJson ? DB::raw("ST_GeomFromGeoJSON('$geomJson')") : null,
         ]);
 
-        // 🌟 Cập nhật bảng trung gian bằng sync(): Tự động xóa liên kết cũ và gán liên kết mới
-        if ($request->status === 'rented' && !empty($request->company_ids)) {
-            $plot->companies()->sync($request->company_ids);
-        } else {
-            $plot->companies()->detach(); // Xóa sạch nếu chuyển trạng thái không thuê
-        }
-
         return redirect()->back()->with('success', 'Cập nhật lô đất thành công!');
     }
 
@@ -120,10 +128,10 @@ class PlotController extends Controller
     {
         $plot = Plot::findOrFail($id);
 
-        // Hủy liên kết trong bảng trung gian trước khi xóa
-        $plot->companies()->detach();
+        // 1. Gỡ bỏ liên kết plot_id ở các nhà xưởng thuộc lô đất này
+        $plot->factories()->update(['plot_id' => null]);
 
-        // 🌟 Xóa bằng Eloquent Model (Kích hoạt Audit Log Event DELETED)
+        // 2. Xóa lô đất
         $plot->delete();
 
         return redirect()->back()->with('success', 'Đã xóa lô đất!');

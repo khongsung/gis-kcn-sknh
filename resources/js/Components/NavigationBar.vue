@@ -53,6 +53,24 @@
         </Link>
       </nav>
 
+      <!-- 🌟 DROPDOWN CHỌN KHU CÔNG NGHIỆP -->
+      <div v-if="zones && zones.length" class="zone-nav-selector">
+        <span class="selector-icon">📍</span>
+        <select 
+          v-model="selectedZoneId" 
+          @change="onZoneSelectChange"
+          class="zone-nav-select"
+        >
+          <option 
+            v-for="zone in zones" 
+            :key="zone.id" 
+            :value="zone.id"
+          >
+            {{ zone.name }} ({{ zone.code }})
+          </option>
+        </select>
+      </div>
+    
       <!-- 3. KHUNG USER / ĐĂNG NHẬP (BÊN PHẢI CÙNG) -->
       <div class="nav-auth">
         <!-- ĐÃ ĐĂNG NHẬP -->
@@ -93,10 +111,23 @@ import { Link } from '@inertiajs/inertia-vue3';
 export default {
   name: 'NavigationBar',
   components: { Link },
+  props: {
+    // Nhận danh sách KCN từ trang Map.vue truyền vào
+    zones: {
+      type: Array,
+      default: () => []
+    },
+    // Nhận ID của KCN đang chọn mặc định
+    currentZoneId: {
+      type: [Number, String],
+      default: null
+    }
+  },
   data() {
     return {
       isMobileMenuOpen: false,
-      imageError: false
+      imageError: false,
+      selectedZoneId: this.currentZoneId || (this.zones.length ? this.zones[0].id : null)
     };
   },
   computed: {
@@ -112,6 +143,19 @@ export default {
       return this.currentUser && this.currentUser.role === 'admin';
     }
   },
+  watch: {
+    currentZoneId(newVal) {
+      if (newVal) this.selectedZoneId = newVal;
+    },
+    zones: {
+      handler(newZones) {
+        if (!this.selectedZoneId && newZones && newZones.length > 0) {
+          this.selectedZoneId = newZones[0].id;
+        }
+      },
+      immediate: true
+    }
+  },
   methods: {
     handleLogoError() {
       this.imageError = true;
@@ -120,6 +164,14 @@ export default {
     logout() {
       if (confirm('Anh có chắc chắn muốn đăng xuất khỏi hệ thống?')) {
         this.$inertia.post('/logout');
+      }
+    },
+
+    onZoneSelectChange() {
+      // 🌟 Bắn sự kiện ra ngoài để Map.vue nhận được đối tượng KCN vừa chọn
+      const selectedZone = this.zones.find(z => z.id === this.selectedZoneId);
+      if (selectedZone) {
+        this.$emit('change-zone', selectedZone);
       }
     }
   }
@@ -343,6 +395,37 @@ export default {
   background: #ef4444;
   color: #ffffff;
   transform: scale(1.05);
+}
+
+/* Style cho Dropdown KCN trên NavigationBar */
+.zone-nav-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
+.selector-icon {
+  font-size: 13px;
+}
+
+.zone-nav-select {
+  background: transparent;
+  color: #38bdf8;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+  padding-right: 4px;
+}
+
+.zone-nav-select option {
+  background: #0f172a;
+  color: #ffffff;
 }
 
 /* RESPONSIVE MOBILE (XỬ LÝ DÀNH RIÊNG CHO IPHONE / SAFARI) */

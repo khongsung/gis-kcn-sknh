@@ -22,9 +22,15 @@ class WastewaterManhole extends Model
         'elevation',
         'pipe_diameter',
         'status',
+        'zone_id',
         'geom',
         'note',
     ];
+
+    public function zone()
+    {
+        return $this->belongsTo(IndustrialZone::class, 'zone_id');
+    }
 
     /**
      * Quan hệ N-1: Hố ga nước thải thuộc về một Công ty

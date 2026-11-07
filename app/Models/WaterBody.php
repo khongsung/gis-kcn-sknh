@@ -16,6 +16,12 @@ class WaterBody extends Model
         'code',
         'area',
         'description',
+        'zone_id',
         'geom',
     ];
+
+    public function zone()
+    {
+        return $this->belongsTo(IndustrialZone::class, 'zone_id');
+    }
 }

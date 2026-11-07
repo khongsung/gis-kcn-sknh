@@ -16,10 +16,10 @@
       </div>
 
       <div class="layer-list">
-        <!-- 🌟 MỤC TỔNG: BẬT/TẮT VÀ TĂNG GIẢM OPACITY TOÀN BỘ LAYERS -->
+        <!-- 🌟 MỤC TỔNG: BẬT/TẮT VÀ CHỈNH OPACITY TOÀN BỘ LAYERS -->
         <div class="layer-item master-layer">
-          <div class="layer-title">
-            <label>
+          <div class="layer-title-row">
+            <label class="checkbox-container">
               <input 
                 type="checkbox" 
                 v-model="masterLayer.visible" 
@@ -27,9 +27,22 @@
               />
               <b class="master-text">🌐 Tất cả các lớp</b>
             </label>
+
+            <!-- Nút toggle mở rộng thanh slider opacity -->
+            <button 
+              type="button" 
+              class="expand-slider-btn" 
+              :class="{ 'is-expanded': expandedSliders['master'] }"
+              @click.stop="toggleSlider('master')" 
+              title="Độ trong suốt chung"
+            >
+              <span class="opacity-percent">{{ Math.round(masterLayer.opacity * 100) }}%</span>
+              <span class="arrow-icon">{{ expandedSliders['master'] ? '▴' : '▾' }}</span>
+            </button>
           </div>
-          <!-- <div class="opacity-control" v-if="masterLayer.visible"> -->
-          <div class="opacity-control">
+
+          <!-- Thanh kéo Opacity của Master Layer (Chỉ hiện khi bấm icon mở rộng) -->
+          <div class="opacity-control" v-show="expandedSliders['master']">
             <div class="opacity-label">
               <span>Độ trong suốt chung</span>
               <b>{{ Math.round(masterLayer.opacity * 100) }}%</b>
@@ -46,32 +59,44 @@
         </div>
 
         <div class="divider-container">
-          <span class="divider-text">LỚP DỮ LIỆU CHUYÊN CƠ</span>
+          <span class="divider-text">DANH SÁCH LỚP DỮ LIỆU</span>
         </div>
 
-        <!-- 🌟 DANH SÁCH LỚP DỮ LIỆU ĐƯỢC RENDER TỰ ĐỘNG BẰNG V-FOR -->
+        <!-- 🌟 DANH SÁCH PHẲNG TẤT CẢ CÁC LỚP (BAO GỒM CẢ CHIẾU SÁNG) -->
         <div 
           v-for="item in layerConfig" 
           :key="item.key" 
           class="layer-item"
           :class="{ 'is-active': layers[item.key].visible }"
         >
-          <div class="layer-title">
-            <label>
+          <div class="layer-title-row">
+            <label class="checkbox-container">
               <input 
                 type="checkbox" 
                 v-model="layers[item.key].visible" 
                 @change="updateLayer(item.key)"
               />
               <span class="layer-badge" :style="{ backgroundColor: item.badgeColor }"></span>
-              <b class="layer-name" :style="{ color: item.textColor || '#0f172a' }">
+              <span class="layer-name" :style="{ color: item.textColor || '#0f172a' }">
                 {{ item.icon }} {{ item.label }}
-              </b>
+              </span>
             </label>
+
+            <!-- Nút bấm mở rộng thanh cuộn Opacity riêng của layer -->
+            <button 
+              type="button" 
+              class="expand-slider-btn" 
+              :class="{ 'is-expanded': expandedSliders[item.key] }"
+              @click.stop="toggleSlider(item.key)" 
+              title="Chỉnh độ trong suốt"
+            >
+              <span class="opacity-percent">{{ Math.round(layers[item.key].opacity * 100) }}%</span>
+              <span class="arrow-icon">{{ expandedSliders[item.key] ? '▴' : '▾' }}</span>
+            </button>
           </div>
 
-          <!-- <div class="opacity-control" v-if="layers[item.key].visible"> -->
-          <div class="opacity-control">
+          <!-- Thanh kéo Opacity (Ẩn mặc định, chỉ hiện khi click icon mở rộng) -->
+          <div class="opacity-control" v-show="expandedSliders[item.key]">
             <div class="opacity-label">
               <span>Độ rõ hiển thị</span>
               <b>{{ Math.round(layers[item.key].opacity * 100) }}%</b>
@@ -86,6 +111,7 @@
             />
           </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -94,9 +120,15 @@
 <script>
 export default {
   name: 'LayerControlSidebar',
+  emits: ['change-layer'],
   data() {
     return {
       isOpen: false, // Trạng thái đóng/mở sidebar trên mobile
+
+      // Lưu trạng thái ẩn/hiện thanh cuộn opacity của từng layer
+      expandedSliders: {
+        master: false
+      },
       
       // Cấu hình Nút Tổng Master
       masterLayer: {
@@ -104,30 +136,48 @@ export default {
         opacity: 0.7
       },
 
-      // Danh mục hiển thị và màu sắc nhận diện các Layer
+      // Danh mục cấu hình phẳng cho tất cả các Layer
       layerConfig: [
-        { key: 'plots', label: 'Lô đất quy hoạch', icon: '🏢', badgeColor: '#b45309', textColor: '#b45309' },
+        { key: 'boundaries', label: 'Ranh giới quy hoạch', icon: '🔲', badgeColor: '#e11d48', textColor: '#e11d48' },
+        { key: 'plots', label: 'Lô đất KCN', icon: '🏢', badgeColor: '#b45309', textColor: '#b45309' },
+        { key: 'factories', label: 'Nhà xưởng KCN', icon: '🏭', badgeColor: '#166534', textColor: '#166534' },
         { key: 'roads', label: 'Đường giao thông', icon: '🛣️', badgeColor: '#f59e0b', textColor: '#d97706' },
         { key: 'greenery', label: 'Cây xanh & Thảm cỏ', icon: '🌳', badgeColor: '#16a34a', textColor: '#15803d' },
         { key: 'waterBodies', label: 'Mặt nước & Hồ điều hòa', icon: '🌊', badgeColor: '#0284c7', textColor: '#0369a1' },
-        { key: 'factories', label: 'Nhà xưởng KCN', icon: '🏭', badgeColor: '#166534', textColor: '#166534' },
+        
+        // 🌟 3 LỚP HỆ THỐNG ĐIỆN CHIẾU SÁNG MỚI BỔ SUNG 🌟
+        { key: 'lightingCabinets', label: 'Tủ điện điều khiển', icon: '⚡', badgeColor: '#d97706', textColor: '#b45309' },
+        { key: 'lightingCables', label: 'Tuyến cáp chiếu sáng', icon: '〰️', badgeColor: '#f59e0b', textColor: '#d97706' },
+        { key: 'lightingPoles', label: 'Cột đèn chiếu sáng', icon: '💡', badgeColor: '#ca8a04', textColor: '#ca8a04' },
+
         { key: 'wastewater', label: 'Hố ga Nước thải', icon: '🧪', badgeColor: '#800080', textColor: '#800080' },
-        { key: 'rainwater', label: 'Hố ga Nước mưa', icon: '🌧️', badgeColor: '#0284c7', textColor: '#0284c7' }
+        { key: 'rainwater', label: 'Hố ga Nước mưa', icon: '🌧️', badgeColor: '#0284c7', textColor: '#0284c7' },
+        { key: 'surroundingLocations', label: 'Vùng phụ cận lân cận', icon: '📍', badgeColor: '#047857', textColor: '#047857' }
       ],
 
-      // Trạng thái Bật/Tắt và Độ rõ (Opacity) mặc định
+      // Giá trị mặc định của từng Layer
       layers: {
+        boundaries: { visible: true, opacity: 0.95 },
         plots: { visible: true, opacity: 0.4 },
+        factories: { visible: false, opacity: 0.65 },
         roads: { visible: true, opacity: 0.85 },
-        greenery: { visible: true, opacity: 0.5, name: "greenery"},    
-        waterBodies: { visible: true, opacity: 0.6, name: "waterBodies"},
+        greenery: { visible: true, opacity: 0.5, name: "greenery" },    
+        waterBodies: { visible: true, opacity: 0.6, name: "waterBodies" },
+        lightingCabinets: { visible: false, opacity: 1.0 },
+        lightingCables: { visible: false, opacity: 0.9 },
+        lightingPoles: { visible: false, opacity: 0.95 },
+        wastewater: { visible: false, opacity: 0.9 },
         rainwater: { visible: false, opacity: 0.9 },
-        factories: { visible: false, opacity: 0.6 },
-        wastewater: { visible: false, opacity: 0.9 }
+        surroundingLocations: { visible: true, opacity: 1.0 }
       }
     };
   },
   methods: {
+    // 🌟 ĐÓNG / MỞ THANH SLIDER OPACITY CỦA TỪNG LAYER
+    toggleSlider(key) {
+      this.expandedSliders[key] = !this.expandedSliders[key];
+    },
+
     // 1. CẬP NHẬT TỪNG LỚP CON RIÊNG LẺ
     updateLayer(layerName) {
       this.$emit('change-layer', {
@@ -175,7 +225,6 @@ export default {
 </script>
 
 <style scoped>
-/* PC / Desktop Style */
 .mobile-toggle-btn, .close-mobile-btn, .sidebar-overlay {
   display: none;
 }
@@ -192,7 +241,7 @@ export default {
 }
 
 .sidebar-header {
-  padding: 16px 20px;
+  padding: 14px 18px;
   background: #0f172a;
   color: #ffffff;
   display: flex;
@@ -202,7 +251,7 @@ export default {
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.3px;
 }
@@ -210,13 +259,13 @@ export default {
 .layer-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* Nổi bật mục Master Layer */
+/* Master Layer */
 .layer-item.master-layer {
   background: #eff6ff;
   border: 1.5px solid #3b82f6;
@@ -225,13 +274,13 @@ export default {
 
 .master-text {
   color: #1d4ed8;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 .divider-container {
   display: flex;
   align-items: center;
-  margin: 6px 0;
+  margin: 6px 0 2px 0;
 }
 
 .divider-text {
@@ -241,11 +290,12 @@ export default {
   letter-spacing: 0.8px;
 }
 
+/* Từng mục Layer */
 .layer-item {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 8px 12px;
   transition: all 0.2s ease;
 }
 
@@ -258,12 +308,29 @@ export default {
   background: #ffffff;
 }
 
-.layer-title label {
+.layer-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.checkbox-container {
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12.5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.checkbox-container input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #2563eb;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
 .layer-badge {
@@ -275,17 +342,60 @@ export default {
 }
 
 .layer-name {
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* CONTROL OPACITY STYLING */
+/* Nút toggle mở rộng slider */
+.expand-slider-btn {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #64748b;
+  font-size: 11px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.expand-slider-btn:hover,
+.expand-slider-btn.is-expanded {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.opacity-percent {
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.arrow-icon {
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* KHUNG CHỨA SLIDER OPACITY */
 .opacity-control {
-  margin-top: 10px;
+  margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .opacity-label {
@@ -337,8 +447,8 @@ export default {
     display: block;
     position: fixed;
     top: 60px; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(0px);
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(0.5px);
     z-index: 1001;
   }
 
@@ -359,7 +469,7 @@ export default {
   }
 
   .layer-sidebar.is-open {
-    max-height: 220px;
+    max-height: 240px;
   }
 
   .sidebar-header {
@@ -387,15 +497,10 @@ export default {
   }
 
   .layer-item {
-    flex: 0 0 180px;
+    flex: 0 0 210px;
     margin-bottom: 0;
     padding: 10px;
     scroll-snap-align: start;
-  }
-
-  .layer-title label {
-    font-size: 12px;
-    white-space: nowrap;
   }
 }
 </style>

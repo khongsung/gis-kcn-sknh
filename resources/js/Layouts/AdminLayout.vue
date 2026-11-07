@@ -81,6 +81,45 @@
               <span class="icon">🌊</span>
               <span class="label">Quản lý Mặt Nước</span>
             </a>
+
+            <a href="/admin/boundaries" class="menu-item" :class="{ active: currentPath.startsWith('/admin/boundaries') }">
+              <span class="icon">🔲</span>
+              <span class="label">Quản lý Ranh Giới QH</span>
+            </a>
+
+            <a 
+              href="/admin/lighting-cabinets" 
+              class="menu-item" 
+              :class="{ 'active': $page.url.startsWith('/admin/lighting-cabinets') }"
+            >
+              <span class="icon">⚡</span>
+              <span>Quản lý Tủ điện chiếu sáng</span>
+            </a>
+
+            <a 
+              href="/admin/lighting-cables" 
+              class="menu-item" 
+              :class="{ 'active': $page.url.startsWith('/admin/lighting-cables') }"
+            >
+              <span class="icon">〰️</span>
+              <span>Tuyến cáp chiếu sáng</span>
+            </a>
+
+            <a href="/admin/lighting-poles" class="menu-item" :class="{ active: currentPath.startsWith('/admin/lighting-poles') }">
+              <span class="icon">💡</span>
+              <span>Cột đèn chiếu sáng</span>
+            </a>
+
+            <a href="/admin/surrounding-locations" class="menu-item" :class="{ active: currentPath.startsWith('/admin/surrounding-locations') }">
+              <span class="icon">📍</span>
+              <span>Vùng phụ cận & Địa danh</span>  
+            </a>
+
+            <a href="/admin/industrial-zones" class="menu-item" :class="{ active: currentPath.startsWith('/admin/industrial-zones') }">
+              <span class="icon">🏭</span>
+              <span>Khu Công Nghiệp</span>
+            </a>
+
           </template>
 
           <!-- MENU DÀNH CHO CẢ ADMIN VÀ USER DOANH NGHIỆP -->

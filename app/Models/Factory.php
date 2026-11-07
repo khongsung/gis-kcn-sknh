@@ -18,8 +18,14 @@ class Factory extends Model
         'status',
         'plot_id',
         'company_id',
+        'zone_id',
         'geom',
     ];
+
+    public function zone()
+    {
+        return $this->belongsTo(IndustrialZone::class, 'zone_id');
+    }
 
     /**
      * Chỉ định rõ ràng Factory khởi tạo cho Model này

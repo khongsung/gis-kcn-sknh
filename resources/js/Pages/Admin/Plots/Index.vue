@@ -24,16 +24,6 @@
             />
           </div>
 
-          <div class="filter-box">
-            <label>Trạng thái:</label>
-            <select v-model="statusFilter">
-              <option value="">-- Tất cả trạng thái --</option>
-              <option value="available">🟢 Đang trống</option>
-              <option value="rented">🔴 Đã cho thuê</option>
-              <option value="planning">🟡 Đang quy hoạch</option>
-            </select>
-          </div>
-
           <div class="stats-mini">
             <span class="stat-item">
               📦 Tổng số lô: <b>{{ plots.length }}</b>
@@ -54,9 +44,9 @@
                 <th>STT</th>
                 <th>Mã Lô Đất</th>
                 <th>Diện Tích (m²)</th>
-                <th>Trạng Thái</th>
+                <th style="min-width: 200px;">Giới Thiệu / Trích Ngang</th>
                 <th>Tọa Độ GIS</th>
-                <th>Các Đơn Vị Thuê (N-N)</th>
+                <th>Các Đơn Vị Thuê</th>
                 <th class="text-center">Thao Tác</th>
               </tr>
             </thead>
@@ -70,15 +60,14 @@
                   </span>
                 </td>
                 <td>
-                  <span class="status-badge" :class="p.status || 'available'">
-                    {{ formatStatus(p.status) }}
-                  </span>
+                  <div class="desc-cell" :title="p.description">
+                    {{ p.description || '—' }}
+                  </div>
                 </td>
                 <td>
                   <span v-if="p.geojson || p.geom" class="badge-gis">📍 Polygon GeoJSON</span>
                   <span v-else class="text-muted">Chưa có tọa độ</span>
                 </td>
-                <!-- HIỂN THỊ DANH SÁCH NHIỀU CÔNG TY TRÊN CÙNG 1 LÔ ĐẤT -->
                 <td>
                   <div v-if="p.companies && p.companies.length" class="company-tags">
                     <span v-for="c in p.companies" :key="c.id" class="company-tag">
@@ -125,17 +114,6 @@
               </div>
 
               <div class="form-group half">
-                <label>Trạng Thái Lô Đất <span class="required">*</span></label>
-                <select v-model="form.status">
-                  <option value="available">🟢 Đang trống / Sẵn sàng</option>
-                  <option value="rented">🔴 Đã cho thuê</option>
-                  <option value="planning">🟡 Đang quy hoạch</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group half">
                 <label>Diện tích (m²) <span class="required">*</span></label>
                 <input 
                   type="number" 
@@ -147,21 +125,22 @@
                 />
                 <small v-if="form.errors.area" class="error-text">{{ form.errors.area }}</small>
               </div>
+            </div>
 
-              <div class="form-group half">
-                <label>Giới thiệu / Mô tả</label>
-                <input 
-                  type="text" 
-                  v-model="form.description" 
-                  placeholder="Lô đất công nghiệp đa ngành" 
-                  :class="{ 'input-error': form.errors.description }"
-                />
-                <small v-if="form.errors.description" class="error-text">{{ form.errors.description }}</small>
-              </div>
+            <!-- 🌟 Ô GIỚI THIỆU / MÔ TẢ ĐÃ CHUYỂN THÀNH TEXTAREA CHIẾM TRỌN CHIỀU RỘNG -->
+            <div class="form-group full-width">
+              <label>Giới thiệu / Trích ngang Lô đất</label>
+              <textarea 
+                v-model="form.description" 
+                rows="4"
+                placeholder="Nhập trích ngang, thông số kỹ thuật, hiện trạng mặt bằng, các ngành nghề ưu tiên thu hút đầu tư..."
+                :class="{ 'input-error': form.errors.description }"
+              ></textarea>
+              <small v-if="form.errors.description" class="error-text">{{ form.errors.description }}</small>
             </div>
 
             <!-- NHẬP TỌA ĐỘ RANH GIỚI POLYGON CÓ PREFIX -->
-            <div class="form-group">
+            <div class="form-group full-width">
               <label>Tọa độ ranh giới Lô đất (Các đỉnh đa giác)</label>
               <div class="geojson-input-wrapper">
                 <span class="prefix-tag">{"type":"Polygon","coordinates":[[</span>
@@ -218,7 +197,7 @@ export default {
       selectedPlotId: null,
       searchQuery: '',
       statusFilter: '',
-      coordinates_input: '', // 🌟 Đã khai báo biến này để tránh crash dữ liệu
+      coordinates_input: '',
       form: this.$inertia.form({
         code: '',
         area: '',
@@ -229,12 +208,10 @@ export default {
     };
   },
   computed: {
-    // 🌟 Tính tổng diện tích toàn bộ quỹ đất KCN
     totalPlotsArea() {
       return this.plots.reduce((sum, p) => sum + (parseFloat(p.total_area || p.area) || 0), 0);
     },
 
-    // 🌟 Lọc danh sách Lô đất theo ô Tìm kiếm & Dropdown Trạng thái real-time
     filteredPlots() {
       return this.plots.filter(p => {
         const query = this.searchQuery.toLowerCase().trim();
@@ -249,7 +226,6 @@ export default {
       });
     },
 
-    // Validate Polygon: Phải có ít nhất 3 đỉnh phân biệt
     isCoordinatesValid() {
       if (!this.coordinates_input || this.coordinates_input.trim() === '') return true;
       const pointStrings = this.coordinates_input.split(';').map(p => p.trim()).filter(p => p !== '');
@@ -262,7 +238,6 @@ export default {
       return true;
     },
 
-    // Validate Form cơ bản trước khi nộp
     isFormValid() {
       const isCodeValid = this.form.code && this.form.code.trim() !== '';
       const isAreaValid = this.form.area && !isNaN(this.form.area);
@@ -270,7 +245,6 @@ export default {
     }
   },
   methods: {
-    // 🌟 Tự động đóng gói GeoJSON từ ô nhập tọa độ Google Maps
     onCoordinatesChange() {
       if (!this.coordinates_input || this.coordinates_input.trim() === '') {
         this.form.geojson = '';
@@ -280,7 +254,6 @@ export default {
       if (this.isCoordinatesValid) {
         const pointStrings = this.coordinates_input.split(';').map(p => p.trim()).filter(p => p !== '');
         
-        // Chuyển danh sách nhập vào thành mảng điểm [Lng, Lat]
         const coords = pointStrings.map(pStr => {
           const parts = pStr.split(',').map(item => parseFloat(item.trim()));
           let lat, lng;
@@ -294,14 +267,12 @@ export default {
           return [lng, lat];
         });
 
-        // TỰ ĐỘNG KHÉP KÍN ĐA GIÁC: Nếu điểm cuối chưa trùng điểm đầu, tự động chèn điểm đầu vào cuối
         const firstPt = coords[0];
         const lastPt = coords[coords.length - 1];
         if (firstPt[0] !== lastPt[0] || firstPt[1] !== lastPt[1]) {
           coords.push([firstPt[0], firstPt[1]]);
         }
 
-        // Đóng gói GeoJSON Polygon chuẩn (Lớp mảng đôi)
         this.form.geojson = JSON.stringify({
           type: 'Polygon',
           coordinates: [coords]
@@ -311,7 +282,6 @@ export default {
       }
     },
 
-    // Trích xuất tọa độ hiển thị lại ô textarea khi mở Modal sửa
     extractCoordinates(geomData) {
       if (!geomData) return '';
       let parsed = geomData;
@@ -328,7 +298,7 @@ export default {
           const first = pointsToDisplay[0];
           const last = pointsToDisplay[pointsToDisplay.length - 1];
           if (first[0] === last[0] && first[1] === last[1]) {
-            pointsToDisplay.pop(); // Bỏ điểm trùng cuối khép kín
+            pointsToDisplay.pop();
           }
         }
 
@@ -375,7 +345,6 @@ export default {
     },
 
     savePlot() {
-      // Đảm bảo đóng gói GeoJSON trước khi submit
       this.onCoordinatesChange();
 
       if (this.isEditMode) {
@@ -398,12 +367,6 @@ export default {
     formatNumber(num) { 
       if (!num) return '0';
       return new Intl.NumberFormat('vi-VN').format(num); 
-    },
-
-    formatStatus(status) {
-      if (status === 'rented') return '🔴 Đã cho thuê';
-      if (status === 'available') return '🟢 Đang trống';
-      return '🟡 Đang quy hoạch';
     }
   }
 };
@@ -426,10 +389,6 @@ export default {
 .search-icon { margin-right: 8px; font-size: 14px; }
 .search-box input { border: none; background: transparent; outline: none; width: 100%; font-size: 13px; color: #0f172a; }
 
-.filter-box { display: flex; align-items: center; gap: 8px; }
-.filter-box label { font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap; }
-.filter-box select { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; outline: none; background: #fff; }
-
 .stats-mini { display: flex; gap: 12px; font-size: 12px; color: #475569; margin-left: auto; }
 .stat-item { background: #f1f5f9; padding: 6px 12px; border-radius: 6px; }
 .stat-item.highlight { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
@@ -443,16 +402,12 @@ export default {
 
 .plot-code { color: #b45309; font-size: 13px; }
 .area-text { font-weight: 600; color: #0f172a; }
+.desc-cell { max-width: 260px; line-height: 1.5; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .badge-gis { background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
 .text-muted { color: #94a3b8; font-size: 12px; }
 
 .company-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .company-tag { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
-
-.status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-.status-badge.rented { background: #fef2f2; color: #dc2626; }
-.status-badge.available { background: #ecfdf5; color: #059669; }
-.status-badge.planning { background: #fffbeb; color: #d97706; }
 
 .actions-cell { display: flex; justify-content: center; gap: 8px; }
 .btn-icon { border: none; background: #f1f5f9; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; }
@@ -466,17 +421,19 @@ export default {
 
 /* MODAL STYLES */
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.modal-content { background: #fff; border-radius: 14px; width: 100%; max-width: 580px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
+.modal-content { background: #fff; border-radius: 14px; width: 100%; max-width: 620px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
 .modal-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 .modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
 .close-btn { border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748b; }
 .modal-form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-.form-row { display: flex; gap: 10px; }
+.form-row { display: flex; gap: 12px; }
 .half { flex: 1; }
+.full-width { width: 100%; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-group label { font-size: 13px; font-weight: 600; color: #334155; }
 .required { color: #dc2626; }
-.form-group input, .form-group select, .form-group textarea { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
+.form-group input, .form-group select, .form-group textarea { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; font-family: inherit; }
+.form-group textarea { resize: vertical; min-height: 85px; line-height: 1.5; }
 .input-error { border-color: #dc2626 !important; background-color: #fef2f2 !important; }
 .error-text { font-size: 11px; color: #dc2626; margin-top: 2px; display: block; }
 .help-text { font-size: 11px; color: #64748b; margin-top: 4px; display: block; }

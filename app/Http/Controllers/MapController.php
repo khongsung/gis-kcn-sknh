@@ -206,6 +206,153 @@ class MapController extends Controller
             })
         ];
 
+        // 🌟 TRUY VẤN RANH GIỚI QUY HOẠCH KCN SANG GEOJSON
+        $boundaryQuery = "
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(b.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', b.id,
+                        'code', b.code,
+                        'name', b.name,
+                        'zone_name', z.name,
+                        'decision_number', b.decision_number,
+                        'approval_date', b.approval_date,
+                        'total_planning_area', b.total_planning_area,
+                        'legal_basis', b.legal_basis,
+                        'fill_color', b.fill_color
+                    )
+                ) AS feature 
+                FROM industrial_zone_boundaries b
+                LEFT JOIN industrial_zones z ON b.zone_id = z.id
+            ) sub;
+        ";
+        
+        $rawBoundaries = DB::selectOne($boundaryQuery);
+        $boundariesData = $rawBoundaries ? json_decode($rawBoundaries->geojson) : ['type' => 'FeatureCollection', 'features' => []];
+
+
+        // 1. Tủ điện chiếu sáng (Point)
+        $cabinetsData = DB::selectOne("
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(c.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', c.id,
+                        'code', c.code,
+                        'name', c.name,
+                        'capacity_kva', c.capacity_kva,
+                        'control_type', c.control_type,
+                        'power_source', c.power_source,
+                        'channels_count', c.channels_count,
+                        'status', c.status,
+                        'notes', c.notes
+                    )
+                ) AS feature FROM lighting_cabinets c WHERE c.geom IS NOT NULL
+            ) sub
+        ");
+
+        // 2. Tuyến cáp chiếu sáng (LineString)
+        $cablesData = DB::selectOne("
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(cb.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', cb.id,
+                        'code', cb.code,
+                        'name', cb.name,
+                        'cable_spec', cb.cable_spec,
+                        'installation_type', cb.installation_type,
+                        'depth_m', cb.depth_m,
+                        'conduit_type', cb.conduit_type,
+                        'length_m', ROUND(ST_Length(cb.geom::geography)::numeric, 2),
+                        'status', cb.status
+                    )
+                ) AS feature FROM lighting_cables cb WHERE cb.geom IS NOT NULL
+            ) sub
+        ");
+
+        // 3. Cột đèn chiếu sáng (Point)
+        $polesData = DB::selectOne("
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(p.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', p.id,
+                        'code', p.code,
+                        'height_m', p.height_m,
+                        'pole_material', p.pole_material,
+                        'arm_type', p.arm_type,
+                        'lamp_type', p.lamp_type,
+                        'wattage', p.wattage,
+                        'status', p.status,
+                        'notes', p.notes
+                    )
+                ) AS feature FROM lighting_poles p WHERE p.geom IS NOT NULL
+            ) sub
+        ");
+
+        // Lấy các vùng phụ cận lân cận KCN
+        $surroundingLocationsData = DB::selectOne("
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(sl.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', sl.id,
+                        'code', sl.code,
+                        'name', sl.name,
+                        'category', sl.category,
+                        'bg_color', sl.bg_color,
+                        'text_color', sl.text_color,
+                        'icon', sl.icon,
+                        'description', sl.description
+                    )
+                ) AS feature 
+                FROM surrounding_locations sl 
+                WHERE sl.geom IS NOT NULL AND sl.is_active = true
+            ) sub
+        ");
+
+        // 1. Lấy danh sách tất cả KCN đang hoạt động để làm Dropdown flyTo
+        $zonesList = DB::table('industrial_zones')
+            ->select(
+                'id',
+                'code',
+                'name',
+                'province',
+                'default_zoom',
+                DB::raw('ST_Y(center_geom) as lat'),
+                DB::raw('ST_X(center_geom) as lng')
+            )
+            ->where('is_active', 1)
+            ->orderBy('id', 'asc')
+            ->get();
+
         $user = Auth::user();
 
         // 7. TRUYỀN DỮ LIỆU SANG INERTIA MAP VIEW
@@ -237,6 +384,12 @@ class MapController extends Controller
             ],
             'greeneryData'           => $greeneryData,
             'waterBodiesData'        => $waterBodiesData,
+            'boundariesData' => $boundariesData,
+            'lightingCabinetsData' => json_decode($cabinetsData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
+            'lightingCablesData'   => json_decode($cablesData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
+            'lightingPolesData'    => json_decode($polesData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
+            'surroundingLocationsData' => json_decode($surroundingLocationsData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
+            'zonesList' => $zonesList,
         ]);
     }
 }
