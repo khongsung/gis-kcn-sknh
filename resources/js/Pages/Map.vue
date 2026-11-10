@@ -674,7 +674,7 @@ export default {
       const wastewaterR = this.getPointRadiusInPixels(3.0, 3.5, 9.0);
       const rainwaterR  = this.getPointRadiusInPixels(2.6, 3.0, 8.5);
       const poleR       = this.getPointRadiusInPixels(2.4, 3.0, 8.0);
-      const cableWeight = this.getWeightInPixels(1); // Tăng độ dày cáp lên tương đương 1m           // Cáp chiếu sáng (khoảng 0.6m thực tế)
+      const cableWeight = this.getWeightInPixels(0.3); // Tăng độ dày cáp lên tương đương 1m           // Cáp chiếu sáng (khoảng 0.6m thực tế)
       const cabSize     = this.getCabinetSizeInPixels(2.8, 12, 22); // Tủ điện
 
       // Co giãn hệ thống Nước thải (cả Cống và Hố ga)
@@ -684,7 +684,9 @@ export default {
             subGroup.eachLayer((layer) => {
               if (layer.setRadius) layer.setRadius(wastewaterR);
               if (layer.setStyle && layer.feature && layer.feature.geometry.type.includes('Line')) {
-                layer.setStyle({ weight: this.getPipeWeightInPixels(layer.feature) });
+                // TĂNG ĐỘ DÀY CỐNG NƯỚC THẢI: lấy kích thước tính toán + 2px (hoặc nhân hệ số 1.3)
+                const pipeWeight = Math.max(3, this.getPipeWeightInPixels(layer.feature) + 1.5);
+                layer.setStyle({ weight: pipeWeight });
               }
             });
           }
@@ -698,7 +700,8 @@ export default {
             subGroup.eachLayer((layer) => {
               if (layer.setRadius) layer.setRadius(rainwaterR);
               if (layer.setStyle && layer.feature && layer.feature.geometry.type.includes('Line')) {
-                layer.setStyle({ weight: this.getPipeWeightInPixels(layer.feature) });
+                const pipeWeight = Math.max(3.5, this.getPipeWeightInPixels(layer.feature) + 2);
+                layer.setStyle({ weight: pipeWeight });
               }
             });
           }
@@ -716,7 +719,7 @@ export default {
               }
               // Tuyến cáp (LineString Polyline)
               if (l.setStyle && l.feature && l.feature.geometry.type.includes('Line')) {
-                l.setStyle({ weight: Math.max(1.5, Math.min(4, cableWeight)) });
+                l.setStyle({ weight: Math.max(1, Math.min(2, cableWeight)) });
               }
               // Tủ điện (DivIcon Marker)
               if (l.setIcon && l.feature && l.feature.geometry.type === 'Point') {
@@ -786,47 +789,6 @@ export default {
       this.factoriesGeoJsonLayer = leafletLayers.factories;
     },
 
-    /*drawWastewater() {
-      if (!this.wastewaterManholesData || !this.wastewaterManholesData.features) return;
-
-      leafletLayers.wastewater = L.geoJSON(this.wastewaterManholesData, {
-        interactive: true,
-        pointToLayer: (feature, latlng) => {
-          return L.circleMarker(latlng, {
-            radius: this.getPointRadiusInPixels(1.5, 2, 5.5),
-            fillColor: '#800080',
-            color: '#ffffff',
-            weight: 1.5,
-            opacity: 0.9,
-            fillOpacity: 0.9
-          });
-        },
-        onEachFeature: (feature, layer) => {
-          const props = feature.properties;
-          const lat = layer.getLatLng().lat;
-          const lng = layer.getLatLng().lng;
-
-          layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 180px;">
-              <b style="color: #800080;">🧪 Hố Ga Nước Thải</b><br>
-              <b>Mã:</b> ${props.code}<br>
-              <b>DN:</b> ${props.company_name || 'Chưa gắn'}<br>
-              <b>Độ sâu:</b> ${props.depth || 'N/A'} m<br>
-              <hr style="margin: 6px 0; border: none; border-top: 1px dashed #ccc;">
-              <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
-                🧭 Chỉ đường (Google Maps)
-              </a>
-            </div>
-          `);
-
-          layer.on({
-            mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
-            mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
-          });
-        }
-      });
-    },*/
-
     // 🧪 VẼ HỆ THỐNG NƯỚC THẢI (GỒM CỐNG D400 + MŨI TÊN + HỐ GA)
     drawWastewater() {
       const pipeRenderer = L.svg({ pane: 'pipesPane' });
@@ -867,8 +829,8 @@ export default {
               </div>
             `);
             layer.on({
-              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 3 }); },
-              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) }); }
+              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 }); },
+              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 }); }
             });
           }
         });
@@ -885,7 +847,7 @@ export default {
                   offset: '20px',
                   repeat: '70px',
                   symbol: L.Symbol.arrowHead({
-                    pixelSize: 6,
+                    pixelSize: 8,
                     polygon: true,
                     pathOptions: {
                       pane: 'pipesPane',
@@ -908,12 +870,16 @@ export default {
 
       // 3. VẼ HỐ GA NƯỚC THẢI (Nổi lên trên pointsPane)
       if (this.wastewaterManholesData?.features?.length) {
+        const manholeRenderer = L.svg({ pane: 'pointsPane' });
         const manholeLayer = L.geoJSON(this.wastewaterManholesData, {
           pane: 'pointsPane',
+          renderer: manholeRenderer,
           interactive: true,
           pointToLayer: (feature, latlng) => {
             return L.circleMarker(latlng, {
               pane: 'pointsPane',
+              renderer: manholeRenderer,
+              interactive: true,
               radius: this.getPointRadiusInPixels(1.5, 2, 5.5),
               fillColor: '#800080',
               color: '#ffffff',
@@ -939,6 +905,9 @@ export default {
                 </a>
               </div>
             `);
+            layer.on('click', (e) => {
+              L.DomEvent.stopPropagation(e);
+            });
             layer.on({
               mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
               mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
@@ -952,47 +921,6 @@ export default {
       // Gộp chung toàn bộ thành 1 FeatureGroup
       leafletLayers.wastewater = L.featureGroup(layers);
     },
-
-    /*drawRainwater() {
-      if (!this.rainwaterManholesData || !this.rainwaterManholesData.features) return;
-
-      leafletLayers.rainwater = L.geoJSON(this.rainwaterManholesData, {
-        interactive: true,
-        pointToLayer: (feature, latlng) => {
-          return L.circleMarker(latlng, {
-            radius: this.getPointRadiusInPixels(1.3, 2, 5.0),
-            fillColor: '#007bff',
-            color: '#ffffff',
-            weight: 1.5,
-            opacity: 0.9,
-            fillOpacity: 0.9
-          });
-        },
-        onEachFeature: (feature, layer) => {
-          const props = feature.properties;
-          const lat = layer.getLatLng().lat;
-          const lng = layer.getLatLng().lng;
-
-          layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 180px;">
-              <b style="color: #007bff;">🌧️ Hố Ga Nước Mưa</b><br>
-              <b>Mã:</b> ${props.code}<br>
-              <b>DN:</b> ${props.company_name || 'Chưa gắn'}<br>
-              <b>Nắp:</b> ${props.cover_material || 'N/A'}<br>
-              <hr style="margin: 6px 0; border: none; border-top: 1px dashed #ccc;">
-              <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
-                🧭 Chỉ đường (Google Maps)
-              </a>
-            </div>
-          `);
-
-          layer.on({
-            mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
-            mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
-          });
-        }
-      });
-    },*/
 
     // 🌧️ VẼ HỆ THỐNG NƯỚC MƯA (GỒM CỐNG HỘP/D800 + MŨI TÊN + HỐ GA)
     drawRainwater() {
@@ -1034,8 +962,8 @@ export default {
               </div>
             `);
             layer.on({
-              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 3 }); },
-              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) }); }
+              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 }); },
+              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 }); }
             });
           }
         });
@@ -1052,7 +980,7 @@ export default {
                   offset: '20px',
                   repeat: '70px',
                   symbol: L.Symbol.arrowHead({
-                    pixelSize: 6,
+                    pixelSize: 8,
                     polygon: true,
                     pathOptions: {
                       pane: 'pipesPane',
@@ -1075,12 +1003,16 @@ export default {
 
       // 3. VẼ HỐ GA NƯỚC MƯA (Nổi lên trên pointsPane)
       if (this.rainwaterManholesData?.features?.length) {
+        const rainManholeRenderer = L.svg({ pane: 'pointsPane' });
         const manholeLayer = L.geoJSON(this.rainwaterManholesData, {
           pane: 'pointsPane',
+          renderer: rainManholeRenderer,
           interactive: true,
           pointToLayer: (feature, latlng) => {
             return L.circleMarker(latlng, {
               pane: 'pointsPane',
+              renderer: rainManholeRenderer,
+              interactive: true,
               radius: this.getPointRadiusInPixels(1.3, 2, 5.0),
               fillColor: '#007bff',
               color: '#ffffff',
@@ -1106,6 +1038,9 @@ export default {
                 </a>
               </div>
             `);
+            layer.on('click', (e) => {
+              L.DomEvent.stopPropagation(e);
+            });
             layer.on({
               mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
               mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
@@ -1524,155 +1459,6 @@ export default {
         }
       }).addTo(this.map);
     },
-
-    // ⚡ 1. VẼ TỦ ĐIỆN CHIẾU SÁNG (Point - Hình vuông cam nổi bật)
-    /*drawLightingCabinets() {
-      const initCabSize = this.getCabinetSizeInPixels(1.8, 12, 22);
-
-      if (!this.lightingCabinetsData?.features?.length) return;
-
-      leafletLayers.lightingCabinets = L.geoJSON(this.lightingCabinetsData, {
-        pane: 'lightingPointsPane',
-        interactive: true,
-        pointToLayer: (feature, latlng) => {
-          // Dùng DivIcon hình hộp điện thu nhỏ
-          return L.marker(latlng, {
-            pane: 'lightingPointsPane',
-            icon: L.divIcon({
-              className: 'custom-cabinet-marker',
-              html: `<div class="cabinet-icon-box" style="width: ${initCabSize}px; height: ${initCabSize}px; font-size: ${Math.round(initCabSize * 0.55)}px;" title="${feature.properties.code}">⚡</div>`,
-              iconSize: [initCabSize, initCabSize],
-              iconAnchor: [Math.round(initCabSize / 2), Math.round(initCabSize / 2)]
-            })
-          });
-        },
-        onEachFeature: (feature, layer) => {
-          const p = feature.properties;
-          const lat = layer.getLatLng().lat;
-          const lng = layer.getLatLng().lng;
-
-          layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 200px; font-family: sans-serif;">
-              <h4 style="margin: 0 0 6px 0; color: #d97706;">⚡ TỦ ĐIỆN CHIẾU SÁNG</h4>
-              <p style="margin: 3px 0;"><b>Mã tủ:</b> <span style="color:#d97706; font-weight:bold;">${p.code}</span></p>
-              <p style="margin: 3px 0;"><b>Tên tủ:</b> ${p.name}</p>
-              <p style="margin: 3px 0;"><b>Công suất:</b> ${p.capacity_kva ? p.capacity_kva + ' kVA' : '—'}</p>
-              <p style="margin: 3px 0;"><b>Chế độ điều khiển:</b> ${p.control_type === 'timer' ? '⏱️ Hẹn giờ' : (p.control_type === 'photocell' ? '☀️ Cảm biến quang' : '📡 Smart IoT')}</p>
-              <p style="margin: 3px 0;"><b>Nguồn cấp TBA:</b> ${p.power_source || '—'}</p>
-              <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'active' ? '🟢 Đang hoạt động' : '🔴 Ngừng cấp điện'}</p>
-              <hr style="margin: 6px 0; border: none; border-top: 1px dashed #cbd5e1;">
-              <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
-                🧭 Chỉ đường tới tủ điện
-              </a>
-            </div>
-          `);
-        }
-      });
-    },
-
-    // 〰️ 2. VẼ TUYẾN CÁP CHIẾU SÁNG (LineString - Nét liền màu cam/vàng)
-    drawLightingCables() {
-      if (!this.lightingCablesData?.features?.length) return;
-
-      // 🌟 Dùng SVG renderer riêng cho pane cáp để click xuyên thấu chính xác
-      const cableRenderer = L.svg({ pane: 'lightingCablesPane' });
-
-      leafletLayers.lightingCables = L.geoJSON(this.lightingCablesData, {
-        pane: 'lightingCablesPane',
-        renderer: cableRenderer,
-        interactive: true,
-        style: (feature) => {
-          const isFault = feature.properties.status === 'fault';
-          return {
-            pane: 'lightingCablesPane',
-            color: isFault ? '#ef4444' : '#f59e0b',
-            weight: Math.max(1.5, Math.min(4, this.getWeightInPixels(0.6))), // Tăng lên 4px để dễ click
-            dashArray: feature.properties.installation_type === 'overhead' ? '6, 6' : null,
-            opacity: 0.95
-          };
-        },
-        onEachFeature: (feature, layer) => {
-          const p = feature.properties;
-
-          // Popup thông tin tuyến cáp
-          layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 210px; font-family: sans-serif;">
-              <h4 style="margin: 0 0 6px 0; color: #f59e0b;">〰️ TUYẾN CÁP CHIẾU SÁNG</h4>
-              <p style="margin: 3px 0;"><b>Mã lộ:</b> <span style="color:#0284c7; font-weight:bold;">${p.code}</span></p>
-              <p style="margin: 3px 0;"><b>Tên tuyến:</b> ${p.name}</p>
-              <p style="margin: 3px 0;"><b>Quy cách:</b> ${p.cable_spec || 'Cu/XLPE 4x16mm2'}</p>
-              <p style="margin: 3px 0;"><b>Lắp đặt:</b> ${p.installation_type === 'underground' ? '🚇 Cáp ngầm hào' : '🪢 Cáp treo'}</p>
-              <p style="margin: 3px 0;"><b>Chiều dài đo được:</b> <b style="color:#0284c7;">${p.length_m || '—'} m</b></p>
-              <p style="margin: 3px 0;"><b>Tình trạng:</b> ${p.status === 'normal' ? '🟢 Bình thường' : '🔴 Sự cố đứt/chập'}</p>
-            </div>
-          `);
-
-          // Hiệu ứng rê chuột sáng viền và đổi con trỏ pointer
-          layer.on({
-            mouseover: (e) => { 
-              e.target.setStyle({ weight: 6, color: '#fbbf24', opacity: 1 }); 
-            },
-            mouseout: (e) => { 
-              const isFault = feature.properties.status === 'fault';
-              e.target.setStyle({ weight: 4, color: isFault ? '#ef4444' : '#f59e0b', opacity: 0.95 }); 
-            }
-          });
-        }
-      });
-    },
-
-    // 💡 3. VẼ CỘT ĐÈN CHIẾU SÁNG (Point - Viên tròn vàng phát sáng)
-    drawLightingPoles() {
-      if (!this.lightingPolesData?.features?.length) return;
-
-      // 🌟 Dùng SVG renderer riêng cho cột đèn
-      const poleRenderer = L.svg({ pane: 'lightingPointsPane' });
-
-      leafletLayers.lightingPoles = L.geoJSON(this.lightingPolesData, {
-        pane: 'lightingPointsPane',
-        renderer: poleRenderer,
-        interactive: true,
-        pointToLayer: (feature, latlng) => {
-          const isBroken = feature.properties.status === 'broken';
-          return L.circleMarker(latlng, {
-            pane: 'lightingPointsPane',
-            renderer: poleRenderer,
-            interactive: true, // 🌟 Bắt buộc phải có trong circleMarker để nhận click
-            radius: this.getPointRadiusInPixels(1.2, 1.8, 5.0),         // Tăng từ 4.5px lên 6px để dễ bấm trúng
-            fillColor: isBroken ? '#ef4444' : '#eab308',
-            color: '#ffffff',
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.95
-          });
-        },
-        onEachFeature: (feature, layer) => {
-          const p = feature.properties;
-          const lat = layer.getLatLng().lat;
-          const lng = layer.getLatLng().lng;
-
-          layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 190px; font-family: sans-serif;">
-              <h4 style="margin: 0 0 6px 0; color: #ca8a04;">💡 CỘT ĐÈN CHIẾU SÁNG</h4>
-              <p style="margin: 3px 0;"><b>Mã cột:</b> <span style="color:#ca8a04; font-weight:bold;">${p.code}</span></p>
-              <p style="margin: 3px 0;"><b>Chiều cao:</b> ${p.height_m || 8} m (${p.arm_type || 'Cần đơn'})</p>
-              <p style="margin: 3px 0;"><b>Loại bóng:</b> ${p.lamp_type || 'LED'} - <b>${p.wattage || 150}W</b></p>
-              <p style="margin: 3px 0;"><b>Chất liệu:</b> ${p.pole_material || 'Thép mạ kẽm'}</p>
-              <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'working' ? '🟢 Sáng tốt' : (p.status === 'broken' ? '🔴 Hỏng bóng' : '🟡 Bảo dưỡng')}</p>
-              <hr style="margin: 6px 0; border: none; border-top: 1px dashed #cbd5e1;">
-              <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
-                🧭 Chỉ đường tới cột đèn
-              </a>
-            </div>
-          `);
-
-          layer.on({
-            mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
-            mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
-          });
-        }
-      });
-    },*/
 
     // ⚡ VẼ TOÀN BỘ HỆ THỐNG CHIẾU SÁNG (TỦ ĐIỆN + TUYẾN CÁP + CỘT ĐÈN)
     drawLightingSystem() {
@@ -2607,5 +2393,9 @@ export default {
 }
 .leaflet-pane.leaflet-roadsPane-pane svg path {
   pointer-events: auto !important;
+}
+
+.leaflet-control-attribution {
+  display: none !important;
 }
 </style>

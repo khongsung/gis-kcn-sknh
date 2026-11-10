@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Factory;
 use App\Models\Plot;
+use App\Models\IndustrialZone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -36,14 +37,17 @@ class FactoryController extends Controller
         
         // Sử dụng DB::table nếu chưa tạo Model Plot, hoặc Plot::select nếu đã có Model
         $plots = class_exists(Plot::class) 
-            ? Plot::select('id', 'code')->orderBy('code', 'asc')->get()
+            ? Plot::select('id', 'code', 'zone_id')->orderBy('code', 'asc')->get()
             : DB::table('plots')->select('id', 'code')->get();
+
+        $zones = IndustrialZone::select('id', 'name', 'code')->get();
 
         return Inertia::render('Admin/Factories/Index', [
             'auth'      => ['user' => $user],
             'factories' => $factories,
             'companies' => $companies,
             'plots'     => $plots,
+            'zones'     => $zones,
         ]);
     }
 
@@ -57,12 +61,16 @@ class FactoryController extends Controller
             'plot_id'    => 'nullable|exists:plots,id',
             'company_id' => 'nullable|exists:companies,id',
             'geojson'    => 'nullable|string',
+            'zone_id' => 'required|exists:industrial_zones,id'
         ], [
             'code.required' => 'Mã nhà xưởng là bắt buộc',
             'code.unique'   => 'Mã nhà xưởng đã tồn tại',
         ]);
 
-        $geoJson = $request->geojson;
+        $geoJson = !empty($validated['geojson']) ? $validated['geojson'] : null;
+        $inputArea = (isset($validated['area']) && $validated['area'] !== '' && $validated['area'] > 0)
+            ? $validated['area']
+            : null;
 
         // 🌟 Thêm mới bằng Eloquent Model (Kích hoạt Audit Log Event CREATED)
         Factory::create([
@@ -71,8 +79,28 @@ class FactoryController extends Controller
             'status'     => $validated['status'],
             'plot_id'    => $validated['plot_id'] ?? null,
             'company_id' => $validated['status'] === 'rented' ? ($validated['company_id'] ?? null) : null,
+            'zone_id'     => $validated['zone_id'],
             'geom'       => $geoJson ? DB::raw("ST_GeomFromGeoJSON('$geoJson')") : null,
         ]);
+
+        // 2. Gán Polygon và tự động tính diện tích nếu không nhập tay
+        if ($geoJson) {
+            if (empty($inputArea)) {
+                // Tự động tính diện tích mét vuông bằng ST_Area trắc địa
+                DB::statement("
+                    UPDATE factories 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326),
+                        area = ROUND(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)::geography)::numeric, 2)
+                    WHERE id = ?
+                ", [$geoJson, $geoJson, $factory->id]);
+            } else {
+                DB::statement("
+                    UPDATE factories 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)
+                    WHERE id = ?
+                ", [$geoJson, $factory->id]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Thêm nhà xưởng thành công!');
     }
@@ -89,12 +117,16 @@ class FactoryController extends Controller
             'plot_id'    => 'nullable|exists:plots,id',
             'company_id' => 'nullable|exists:companies,id',
             'geojson'    => 'nullable|string',
+            'zone_id' => 'required|exists:industrial_zones,id'
         ], [
             'code.required' => 'Mã nhà xưởng là bắt buộc',
             'code.unique'   => 'Mã nhà xưởng đã tồn tại',
         ]);
 
-        $geoJson = $request->geojson;
+        $geoJson = !empty($validated['geojson']) ? $validated['geojson'] : null;
+        $inputArea = (isset($validated['area']) && $validated['area'] !== '' && $validated['area'] > 0)
+            ? $validated['area']
+            : null;
 
         // 🌟 Cập nhật bằng Eloquent Model (Kích hoạt Audit Log Event UPDATED kèm so sánh dữ liệu cũ/mới)
         $factory->update([
@@ -104,7 +136,25 @@ class FactoryController extends Controller
             'plot_id'    => $validated['plot_id'] ?? null,
             'company_id' => $validated['status'] === 'rented' ? ($validated['company_id'] ?? null) : null,
             'geom'       => $geoJson ? DB::raw("ST_GeomFromGeoJSON('$geoJson')") : null,
+            'zone_id'     => $validated['zone_id'],
         ]);
+
+        if ($geoJson) {
+            if (empty($inputArea)) {
+                DB::statement("
+                    UPDATE factories 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326),
+                        area = ROUND(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)::geography)::numeric, 2)
+                    WHERE id = ?
+                ", [$geoJson, $geoJson, $factory->id]);
+            } else {
+                DB::statement("
+                    UPDATE factories 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)
+                    WHERE id = ?
+                ", [$geoJson, $factory->id]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Cập nhật nhà xưởng thành công!');
     }

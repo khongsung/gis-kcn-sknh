@@ -1,1 +1,15 @@
-body,button,html,input,select,textarea{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif!important}.leaflet-container,.leaflet-control,.leaflet-popup-content,.leaflet-tooltip{font-family:Open Sans,Helvetica Neue,Helvetica,Arial,sans-serif!important}
+/* 1. Import font Open Sans từ Google Fonts (Hỗ trợ tiếng Việt nét căng) */
+/*@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+*/
+/* 2. Áp dụng font chữ cho toàn bộ các phần tử HTML */
+html, body, button, input, select, textarea {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* 3. Ép toàn bộ các Popup, Tooltip, Control của Leaflet dùng chung font chữ */
+.leaflet-container,
+.leaflet-popup-content,
+.leaflet-tooltip,
+.leaflet-control {
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+}

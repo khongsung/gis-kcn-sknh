@@ -19,7 +19,7 @@ class CreateFactoriesTable extends Migration
             $table->foreignId('plot_id')->nullable()->constrained('plots')->onDelete('set null');
             $table->foreignId('company_id')->nullable()->constrained('companies')->onDelete('set null');
             $table->string('code')->unique()->comment('Mã nhà xưởng: CN-01-X1');
-            $table->decimal('area', 10, 2)->comment('Diện tích xưởng m2');
+            $table->decimal('area')->nullable()->comment('Diện tích xưởng m2');
             $table->enum('status', ['available', 'rented', 'under_construction'])->default('available');
             $table->timestamps();
         });

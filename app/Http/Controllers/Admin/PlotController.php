@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Plot;
+use App\Models\IndustrialZone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,7 @@ class PlotController extends Controller
 
         // Danh sách tất cả công ty cho dropdown select
         $companies = Company::select('id', 'name')->orderBy('name', 'asc')->get();
+        $zones = IndustrialZone::select('id', 'name', 'code')->get();
 
         return Inertia::render('Admin/Plots/Index', [
             'auth' => [
@@ -63,6 +65,7 @@ class PlotController extends Controller
             ],
             'plots'     => $plots,
             'companies' => $companies,
+            'zones'     => $zones,
         ]);
     }
 
@@ -78,6 +81,7 @@ class PlotController extends Controller
             'geojson'       => 'nullable|string', 
             'company_ids'   => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
+            'zone_id'       => 'nullable|exists:industrial_zones,id',
         ]);
 
         $geomJson = !empty($validated['geojson']) ? $validated['geojson'] : null;
@@ -92,6 +96,7 @@ class PlotController extends Controller
             'color'       => $validated['color'],
             'total_area'  => $inputArea,
             'description' => $validated['description'] ?? null,
+            'zone_id'     => $validated['zone_id'],
             'geom'        => null,
         ]);
 
@@ -136,6 +141,7 @@ class PlotController extends Controller
             'geojson'       => 'nullable|string',
             'company_ids'   => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
+            'zone_id'       => 'nullable|exists:industrial_zones,id',
         ]);
 
         $geomJson = !empty($validated['geojson']) ? $validated['geojson'] : null;
@@ -150,6 +156,7 @@ class PlotController extends Controller
             'color'       => $validated['color'],
             'total_area'  => $inputArea,
             'description' => $validated['description'] ?? null,
+            'zone_id'     => $validated['zone_id'],
         ]);
 
         // 🌟 2. Cập nhật hình học PostGIS và TỰ ĐỘNG TÍNH LẠI DIỆN TÍCH nếu ô area để trống

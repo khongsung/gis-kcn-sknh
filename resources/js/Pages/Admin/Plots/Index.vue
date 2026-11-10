@@ -5,7 +5,7 @@
       <div class="page-header">
         <div>
           <h2>🗺️ QUẢN LÝ LÔ ĐẤT QUY HOẠCH KCN</h2>
-          <p>Quản lý lô đất, diện tích và các công ty liên kết</p>
+          <p>Quản lý lô đất, phân loại KCN trực thuộc, diện tích và các công ty liên kết</p>
         </div>
         <button class="btn-primary" @click="openCreateModal">
           ➕ Thêm Lô Đất Mới
@@ -15,6 +15,7 @@
       <!-- 2. BẢNG THỐNG KÊ NHANH VÀ THANH TÌM KIẾM/LỌC -->
       <div class="filter-card">
         <div class="filter-row">
+          <!-- Ô tìm kiếm từ khóa -->
           <div class="search-box">
             <span class="search-icon">🔍</span>
             <input 
@@ -24,9 +25,31 @@
             />
           </div>
 
+          <!-- Bộ lọc Khu Công Nghiệp -->
+          <div class="filter-box" v-if="zones.length">
+            <label>Khu công nghiệp:</label>
+            <select v-model="zoneFilter">
+              <option value="">-- Tất cả KCN --</option>
+              <option v-for="z in zones" :key="z.id" :value="z.id">
+                🏭 {{ z.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Bộ lọc Loại Đất -->
+          <div class="filter-box">
+            <label>Loại đất:</label>
+            <select v-model="landTypeFilter">
+              <option value="">-- Tất cả loại đất --</option>
+              <option value="industrial">🏭 Đất Công nghiệp</option>
+              <option value="commercial">🏬 Đất TMDV</option>
+            </select>
+          </div>
+
+          <!-- Thống kê nhanh -->
           <div class="stats-mini">
             <span class="stat-item">
-              📦 Tổng số lô: <b>{{ plots.length }}</b>
+              📦 Số lô: <b>{{ filteredPlots.length }} / {{ plots.length }}</b>
             </span>
             <span class="stat-item highlight">
               📐 Tổng diện tích: <b>{{ formatNumber(totalPlotsArea) }} m²</b>
@@ -43,6 +66,7 @@
               <tr>
                 <th>STT</th>
                 <th>Mã Lô Đất</th>
+                <th>Khu Công Nghiệp</th>
                 <th>Loại Đất</th>
                 <th>Diện Tích (m²)</th>
                 <th style="min-width: 200px;">Giới Thiệu / Trích Ngang</th>
@@ -55,7 +79,16 @@
               <tr v-for="(p, index) in filteredPlots" :key="p.id">
                 <td>{{ index + 1 }}</td>
                 <td><b class="plot-code">🗺️ {{ p.code }}</b></td>
-                <!-- 🌟 CỘT HIỂN THỊ LOẠI ĐẤT & MÀU SẮC -->
+                
+                <!-- Cột hiển thị Khu Công Nghiệp -->
+                <td>
+                  <span v-if="p.zone || getZoneName(p.zone_id)" class="badge-zone">
+                    🏭 {{ p.zone ? p.zone.name : getZoneName(p.zone_id) }}
+                  </span>
+                  <span v-else class="text-muted">—</span>
+                </td>
+
+                <!-- Cột hiển thị loại đất & màu sắc -->
                 <td>
                   <span 
                     class="badge-land-type" 
@@ -69,23 +102,27 @@
                       class="color-dot" 
                       :style="{ backgroundColor: p.color || '#b45309' }"
                     ></span>
-                    {{ p.land_type === 'commercial' ? 'Đất Thương mại dịch vụ' : 'Đất Công nghiệp' }}
+                    {{ p.land_type === 'commercial' ? 'Đất TMDV' : 'Đất Công nghiệp' }}
                   </span>
                 </td>
+
                 <td>
                   <span class="area-text">
                     {{ formatNumber(p.total_area || p.area) }} m²
                   </span>
                 </td>
+
                 <td>
                   <div class="desc-cell" :title="p.description">
                     {{ p.description || '—' }}
                   </div>
                 </td>
+
                 <td>
                   <span v-if="p.geojson || p.geom" class="badge-gis">📍 Polygon GeoJSON</span>
                   <span v-else class="text-muted">Chưa có tọa độ</span>
                 </td>
+
                 <td>
                   <div v-if="p.companies && p.companies.length" class="company-tags">
                     <span v-for="c in p.companies" :key="c.id" class="company-tag">
@@ -94,14 +131,15 @@
                   </div>
                   <span v-else class="text-muted">—</span>
                 </td>
+
                 <td class="text-center actions-cell">
                   <button class="btn-icon btn-edit" @click="openEditModal(p)" title="Sửa thông tin">✏️</button>
                   <button class="btn-icon btn-delete" @click="deletePlot(p)" title="Xóa lô đất">🗑️</button>
                 </td>
               </tr>
               <tr v-if="!filteredPlots.length">
-                <td colspan="7" class="text-center text-muted">
-                  {{ searchQuery || statusFilter ? 'Không tìm thấy lô đất phù hợp với bộ lọc.' : 'Chưa có dữ liệu lô đất.' }}
+                <td colspan="9" class="text-center text-muted">
+                  {{ searchQuery || zoneFilter || landTypeFilter ? 'Không tìm thấy lô đất phù hợp với bộ lọc.' : 'Chưa có dữ liệu lô đất.' }}
                 </td>
               </tr>
             </tbody>
@@ -118,6 +156,7 @@
           </div>
 
           <form @submit.prevent="savePlot" class="modal-form">
+            <!-- HÀNG 1: MÃ LÔ & KHU CÔNG NGHIỆP TRỰC THUỘC -->
             <div class="form-row">
               <div class="form-group half">
                 <label>Mã Lô Đất <span class="required">*</span></label>
@@ -132,6 +171,20 @@
               </div>
 
               <div class="form-group half">
+                <label>Khu Công Nghiệp <span class="required">*</span></label>
+                <select v-model="form.zone_id" required :class="{ 'input-error': form.errors.zone_id }">
+                  <option value="" disabled>-- Chọn Khu Công Nghiệp --</option>
+                  <option v-for="z in zones" :key="z.id" :value="z.id">
+                    🏭 {{ z.name }}
+                  </option>
+                </select>
+                <small v-if="form.errors.zone_id" class="error-text">{{ form.errors.zone_id }}</small>
+              </div>
+            </div>
+
+            <!-- HÀNG 2: LOẠI ĐẤT & DIỆN TÍCH & MÀU SẮC -->
+            <div class="form-row">
+              <div class="form-group third">
                 <label>Loại đất quy hoạch <span class="required">*</span></label>
                 <select v-model="form.land_type" @change="onLandTypeChange" required>
                   <option value="industrial">🏭 Đất Công nghiệp (CN)</option>
@@ -139,23 +192,21 @@
                 </select>
                 <small v-if="form.errors.land_type" class="error-text">{{ form.errors.land_type }}</small>
               </div>
-            </div>
 
-            <!-- 2. BẢNG MÀU COLOR PICKER -->
-            <div class="form-row">
-              <div class="form-group half">
+              <div class="form-group third">
                 <label>Diện tích (m²)</label>
                 <input 
                   type="number" 
                   step="0.1" 
                   v-model="form.area"  
-                  placeholder="10000" 
+                  placeholder="Để trống tự tính theo GIS" 
                   :class="{ 'input-error': form.errors.area }"
                 />
                 <small v-if="form.errors.area" class="error-text">{{ form.errors.area }}</small>
               </div>
-              <div class="form-group half">
-                <label>Màu sắc hiển thị trên WebGIS</label>
+
+              <div class="form-group third">
+                <label>Màu hiển thị WebGIS</label>
                 <div class="color-picker-wrapper">
                   <input 
                     type="color" 
@@ -170,7 +221,6 @@
                     class="color-text-input"
                     maxlength="7"
                   />
-                  <!-- Nút hoàn nguyên màu mặc định theo loại đất -->
                   <button 
                     type="button" 
                     class="btn-reset-color" 
@@ -183,21 +233,20 @@
                 <small v-if="form.errors.color" class="error-text">{{ form.errors.color }}</small>
               </div>
             </div>
-            
 
-            <!-- 🌟 Ô GIỚI THIỆU / MÔ TẢ ĐÃ CHUYỂN THÀNH TEXTAREA CHIẾM TRỌN CHIỀU RỘNG -->
+            <!-- HÀNG 3: MÔ TẢ TRÍCH NGANG -->
             <div class="form-group full-width">
               <label>Giới thiệu / Trích ngang Lô đất</label>
               <textarea 
                 v-model="form.description" 
-                rows="4"
-                placeholder="Nhập trích ngang, thông số kỹ thuật, hiện trạng mặt bằng, các ngành nghề ưu tiên thu hút đầu tư..."
+                rows="3"
+                placeholder="Nhập trích ngang, thông số kỹ thuật, hiện trạng mặt bằng, ngành nghề ưu tiên thu hút đầu tư..."
                 :class="{ 'input-error': form.errors.description }"
               ></textarea>
               <small v-if="form.errors.description" class="error-text">{{ form.errors.description }}</small>
             </div>
 
-            <!-- NHẬP TỌA ĐỘ RANH GIỚI POLYGON CÓ PREFIX -->
+            <!-- HÀNG 4: TỌA ĐỘ RANH GIỚI POLYGON GEOJSON -->
             <div class="form-group full-width">
               <label>Tọa độ ranh giới Lô đất (Các đỉnh đa giác)</label>
               <div class="geojson-input-wrapper">
@@ -215,7 +264,7 @@
                 ⚠️ Đa giác Lô đất cần tối thiểu 3 góc/đỉnh phân cách bằng dấu chấm phẩy (;)
               </small>
               <small v-else class="help-text">
-                Nhập danh sách các đỉnh từ Google Maps: <code>Vĩ độ, Kinh độ; Vĩ độ, Kinh độ...</code> (Hệ thống tự động khép kín đa giác).
+                Nhập danh sách các đỉnh từ Google Maps: <code>Vĩ độ, Kinh độ; Vĩ độ, Kinh độ...</code> (Hệ thống tự động khép kín đa giác và tự tính diện tích nếu để trống ô diện tích).
               </small>
             </div>
 
@@ -246,7 +295,8 @@ export default {
   components: { AdminLayout },
   props: { 
     plots: { type: Array, default: () => [] }, 
-    companies: { type: Array, default: () => [] } 
+    companies: { type: Array, default: () => [] },
+    zones: { type: Array, default: () => [] } // Danh sách KCN từ PlotController
   },
   data() {
     return {
@@ -254,11 +304,13 @@ export default {
       isEditMode: false,
       selectedPlotId: null,
       searchQuery: '',
-      statusFilter: '',
+      zoneFilter: '',
+      landTypeFilter: '',
       coordinates_input: '',
       form: this.$inertia.form({
         code: '',
-        land_type: 'industrial', // 🌟 Mặc định Đất công nghiệp
+        zone_id: '',
+        land_type: 'industrial',
         color: '#b45309',
         area: '',
         status: 'available',
@@ -269,7 +321,7 @@ export default {
   },
   computed: {
     totalPlotsArea() {
-      return this.plots.reduce((sum, p) => sum + (parseFloat(p.total_area || p.area) || 0), 0);
+      return this.filteredPlots.reduce((sum, p) => sum + (parseFloat(p.total_area || p.area) || 0), 0);
     },
 
     filteredPlots() {
@@ -280,9 +332,10 @@ export default {
         const matchCompany = p.companies && p.companies.some(c => c.name && c.name.toLowerCase().includes(query));
 
         const matchesQuery = !query || matchCode || matchDesc || matchCompany;
-        const matchesStatus = !this.statusFilter || (p.status || 'available') === this.statusFilter;
+        const matchesZone = !this.zoneFilter || String(p.zone_id) === String(this.zoneFilter);
+        const matchesLandType = !this.landTypeFilter || p.land_type === this.landTypeFilter;
 
-        return matchesQuery && matchesStatus;
+        return matchesQuery && matchesZone && matchesLandType;
       });
     },
 
@@ -301,20 +354,25 @@ export default {
     isFormValid() {
       const isCodeValid = Boolean(this.form.code && this.form.code.trim() !== '');
       const isLandTypeValid = Boolean(this.form.land_type && this.form.land_type.trim() !== '');
-      return isCodeValid && isLandTypeValid && this.isCoordinatesValid;
+      const isZoneValid = Boolean(this.form.zone_id);
+      return isCodeValid && isLandTypeValid && isZoneValid && this.isCoordinatesValid;
     }
   },
   methods: {
-    // 🌟 Tự động đổi màu khi chuyển đổi loại đất
+    getZoneName(zoneId) {
+      if (!zoneId) return null;
+      const found = this.zones.find(z => String(z.id) === String(zoneId));
+      return found ? found.name : null;
+    },
+
     onLandTypeChange() {
       if (this.form.land_type === 'commercial') {
-        this.form.color = '#e11d48'; // Hồng đỏ cho đất TMDV
+        this.form.color = '#e11d48';
       } else {
-        this.form.color = '#b45309'; // Nâu cam cho đất công nghiệp
+        this.form.color = '#b45309';
       }
     },
 
-    // 🌟 Khôi phục lại màu chuẩn
     resetDefaultColor() {
       this.onLandTypeChange();
     },
@@ -388,6 +446,7 @@ export default {
       this.selectedPlotId = null;
       this.form.reset();
       this.form.clearErrors();
+      this.form.zone_id = this.zones.length ? this.zones[0].id : '';
       this.form.land_type = 'industrial';
       this.form.color = '#b45309';
       this.coordinates_input = '';
@@ -402,7 +461,7 @@ export default {
       this.selectedPlotId = plot.id;
       this.form.clearErrors();
       this.form.code = plot.code || '';
-      // 🌟 Nạp dữ liệu loại đất và màu sắc (có fallback)
+      this.form.zone_id = plot.zone_id || '';
       this.form.land_type = plot.land_type || 'industrial';
       this.form.color = plot.color || (this.form.land_type === 'commercial' ? '#e11d48' : '#b45309');
       this.form.area = plot.total_area || plot.area || '';
@@ -463,12 +522,16 @@ export default {
 
 /* FILTER & STATS CARD */
 .filter-card { background: #fff; border-radius: 12px; padding: 14px 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-.filter-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.filter-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .search-box { display: flex; align-items: center; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 12px; flex: 1; min-width: 240px; }
 .search-icon { margin-right: 8px; font-size: 14px; }
 .search-box input { border: none; background: transparent; outline: none; width: 100%; font-size: 13px; color: #0f172a; }
 
-.stats-mini { display: flex; gap: 12px; font-size: 12px; color: #475569; margin-left: auto; }
+.filter-box { display: flex; align-items: center; gap: 6px; }
+.filter-box label { font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; }
+.filter-box select { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; outline: none; background: #fff; }
+
+.stats-mini { display: flex; gap: 10px; font-size: 12px; color: #475569; margin-left: auto; }
 .stat-item { background: #f1f5f9; padding: 6px 12px; border-radius: 6px; }
 .stat-item.highlight { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 
@@ -476,13 +539,14 @@ export default {
 .table-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
 .table-responsive { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-.data-table th { background: #f8fafc; padding: 12px; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
-.data-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.data-table th { background: #f8fafc; padding: 12px 10px; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+.data-table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
 
 .plot-code { color: #b45309; font-size: 13px; }
-.area-text { font-weight: 600; color: #0f172a; }
-.desc-cell { max-width: 260px; line-height: 1.5; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.badge-gis { background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+.badge-zone { background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.area-text { font-weight: 600; color: #0f172a; white-space: nowrap; }
+.desc-cell { max-width: 240px; line-height: 1.5; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.badge-gis { background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; white-space: nowrap; }
 .text-muted { color: #94a3b8; font-size: 12px; }
 
 .company-tags { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -500,23 +564,24 @@ export default {
 
 /* MODAL STYLES */
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.modal-content { background: #fff; border-radius: 14px; width: 100%; max-width: 620px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
+.modal-content { background: #fff; border-radius: 14px; width: 100%; max-width: 680px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }
 .modal-header { padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 .modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #0f172a; }
 .close-btn { border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748b; }
-.modal-form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-.form-row { display: flex; gap: 12px; }
-.half { flex: 1; }
+.modal-form { padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 85vh; overflow-y: auto; }
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.half { flex: 1; min-width: 240px; }
+.third { flex: 1; min-width: 170px; }
 .full-width { width: 100%; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group label { font-size: 13px; font-weight: 600; color: #334155; }
+.form-group label { font-size: 12px; font-weight: 700; color: #334155; }
 .required { color: #dc2626; }
 .form-group input, .form-group select, .form-group textarea { padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; font-family: inherit; }
-.form-group textarea { resize: vertical; min-height: 85px; line-height: 1.5; }
+.form-group textarea { resize: vertical; min-height: 75px; line-height: 1.5; }
 .input-error { border-color: #dc2626 !important; background-color: #fef2f2 !important; }
 .error-text { font-size: 11px; color: #dc2626; margin-top: 2px; display: block; }
 .help-text { font-size: 11px; color: #64748b; margin-top: 4px; display: block; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .btn-primary:disabled, .btn-disabled { background-color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
 
 /* BADGE HIỂN THỊ LOẠI ĐẤT TRÊN BẢNG */
@@ -544,7 +609,7 @@ export default {
 .color-picker-wrapper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .color-input {
@@ -581,9 +646,9 @@ export default {
   background: #f1f5f9;
   border: 1px solid #cbd5e1;
   color: #475569;
-  padding: 9px 12px;
+  padding: 9px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
