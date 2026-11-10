@@ -22,33 +22,103 @@
 
       <!-- PANEL THÔNG TIN DOANH NGHIỆP KHI CLICK VÀO XƯỞNG -->
       <div v-if="selectedFactory" class="factory-info-panel">
+        <!-- HEADER PANEL -->
         <div class="panel-header">
-          <div>
-            <span class="badge" :class="selectedFactory.status">
-              {{ formatStatus(selectedFactory.status) }}
-            </span>
-            <h2 class="factory-code">Mã xưởng: {{ selectedFactory.code }}</h2>
+          <div class="header-left">
+            <div class="header-badges">
+              <span class="badge" :class="selectedFactory.status">
+                {{ formatStatus(selectedFactory.status) }}
+              </span>
+              <span v-if="selectedFactory.plot_code" class="badge-plot">
+                Lô {{ selectedFactory.plot_code }}
+              </span>
+            </div>
+            <h3 class="factory-code">Xưởng: {{ selectedFactory.code }}</h3>
           </div>
-          <button class="close-btn" @click="selectedFactory = null">✕</button>
+
+          <!-- KHỐI NÚT THAO TÁC GÓC PHẢI -->
+          <div class="header-actions">
+            <!-- ICON CHỈ ĐƯỜNG NHỎ GỌN -->
+            <a 
+              v-if="selectedFactory.lat && selectedFactory.lng"
+              :href="getGoogleMapsUrl(selectedFactory.lat, selectedFactory.lng)" 
+              target="_blank" 
+              class="icon-nav-btn"
+              title="Chỉ đường Google Maps"
+            >
+              🧭
+            </a>
+            <button class="close-btn" @click="selectedFactory = null">✕</button>
+          </div>
         </div>
 
+        <!-- BODY PANEL -->
         <div class="panel-body">
-          <p><strong>Diện tích:</strong> {{ selectedFactory.area }} m²</p>
-          <hr />
-          <!-- NÚT CHỈ ĐƯỜNG TỚI NHÀ XƯỞNG -->
-          <a 
-            :href="getGoogleMapsUrl(selectedFactory.lat, selectedFactory.lng)" 
-            target="_blank" 
-            class="directions-btn-block"
-          >
-            🧭 Chỉ đường tới nhà xưởng này
-          </a>
-          <div>
-            <h3>🏢 {{ selectedFactory.company_name }}</h3>
-            <p><strong>Ngành nghề:</strong> {{ selectedFactory.company_industry || 'Đang cập nhật' }}</p>
-            <p>
-              <strong>SĐT:</strong> 
-              <a :href="'tel:' + selectedFactory.company_phone" class="phone-link">{{ selectedFactory.company_phone || 'N/A' }}</a>
+          <!-- KHỐI DOANH NGHIỆP -->
+          <div class="company-block">
+            <div class="company-title-row">
+              <span 
+                class="color-indicator" 
+                :style="{ backgroundColor: selectedFactory.company_color || '#2563eb' }"
+              ></span>
+              <h4 class="company-name">{{ selectedFactory.company_name || 'Đang trống / Chưa thuê' }}</h4>
+            </div>
+
+            <div class="meta-tags">
+              <span class="tag tag-country">
+                {{ getFlag(selectedFactory.company_country) }} {{ selectedFactory.company_country || 'Việt Nam' }}
+              </span>
+              <span v-if="selectedFactory.zone_name" class="tag tag-zone">
+                🏭 {{ selectedFactory.zone_name }}
+              </span>
+            </div>
+          </div>
+
+          <!-- LƯỚI THÔNG TIN CHI TIẾT (COMPACT GRID) -->
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Diện tích xưởng:</span>
+              <span class="value text-highlight">{{ formatNumber(selectedFactory.area) }} m²</span>
+            </div>
+
+            <div class="info-item" v-if="selectedFactory.company_total_leased_area">
+              <span class="label">Tổng đất thuê:</span>
+              <span class="value">{{ formatNumber(selectedFactory.company_total_leased_area) }} m²</span>
+            </div>
+
+            <div class="info-item">
+              <span class="label">Mã số thuế:</span>
+              <span class="value font-mono">{{ selectedFactory.company_tax_code || '—' }}</span>
+            </div>
+
+            <div class="info-item" v-if="selectedFactory.company_irc_number && selectedFactory.company_irc_number !== '—'">
+              <span class="label">Số GCNĐT (IRC):</span>
+              <span class="value font-mono">{{ selectedFactory.company_irc_number }}</span>
+            </div>
+
+            <div class="info-item full-width" v-if="selectedFactory.company_main_industry || selectedFactory.company_industry">
+              <span class="label">Ngành nghề:</span>
+              <span class="value">{{ selectedFactory.company_main_industry || selectedFactory.company_industry }}</span>
+            </div>
+
+            <div class="info-item full-width" v-if="selectedFactory.company_lease_start_date && selectedFactory.company_lease_end_date">
+              <span class="label">Thời hạn thuê:</span>
+              <span class="value">{{ selectedFactory.company_lease_start_date }} ➔ {{ selectedFactory.company_lease_end_date }}</span>
+            </div>
+          </div>
+
+          <!-- LIÊN HỆ & GHI CHÚ -->
+          <div class="contact-footer">
+            <div class="contact-row">
+              <a v-if="selectedFactory.company_phone && selectedFactory.company_phone !== '—'" :href="'tel:' + selectedFactory.company_phone" class="contact-link phone">
+                📞 {{ selectedFactory.company_phone }}
+              </a>
+              <a v-if="selectedFactory.company_email && selectedFactory.company_email !== '—'" :href="'mailto:' + selectedFactory.company_email" class="contact-link email">
+                ✉️ {{ selectedFactory.company_email }}
+              </a>
+            </div>
+            <p v-if="selectedFactory.company_notes" class="notes-text">
+              <b>Ghi chú:</b> {{ selectedFactory.company_notes }}
             </p>
           </div>
         </div>
@@ -59,6 +129,7 @@
 
 <script>
 import L from 'leaflet';
+import 'leaflet-polylinedecorator';
 import NavigationBar from '@/Components/NavigationBar.vue';
 import LayerControlSidebar from '@/Components/LayerControlSidebar.vue';
 import centerOfMass from '@turf/center-of-mass';
@@ -71,12 +142,11 @@ const leafletLayers = {
   wastewater: null,
   rainwater: null,
   plots: null,
+  companyLands: null, // 🌟 Khai báo layer Đất doanh nghiệp
   roads: null,
   greenery: null,
   waterBodies: null,
-  lightingCabinets: null,
-  lightingCables: null,
-  lightingPoles: null,
+  lightingSystem: null, // 🌟 Gom chung: Tủ điện + Cáp + Cột đèn
   surroundingLocations: null
 };
 
@@ -91,6 +161,7 @@ export default {
     rainwaterManholesData: Object,
     roadsData: Object,
     plotsData: Object,
+    companyLandsData: Object, // 🌟 Nhận GeoJSON từ MapController
     greeneryData: Object,  
     waterBodiesData: Object,
     boundariesData: Object,
@@ -98,6 +169,7 @@ export default {
     lightingCablesData: Object,
     lightingPolesData: Object,
     surroundingLocationsData: Object,
+    drainagePipesData: Object, // 🌟 Nhận dữ liệu đường cống từ controller
     zonesList: { type: Array, default: () => [] },
   },
   data() {
@@ -106,6 +178,7 @@ export default {
       selectedFactory: null,
       roadsGeoJsonLayer: null,
       plotsGeoJsonLayer: null,
+      companyLandsJsonLayer: null,
       factoriesGeoJsonLayer: null,
       greeneryGeoJsonLayer: null,
       waterGeoJsonLayer: null,
@@ -116,11 +189,10 @@ export default {
 
       // 🌟 Lưu trạng thái bật/tắt do người dùng chọn trên Sidebar
       userLayerVisibility: {
-        lightingCabinets: false,
-        lightingCables: false,
-        lightingPoles: false,
+        lightingSystem: false,
         wastewater: false,
         rainwater: false,
+        companyLands: false,
         surroundingLocations: true
       },
 
@@ -217,9 +289,18 @@ export default {
       this.map.getPane('plotsPane').style.zIndex = 420;
       this.map.getPane('plotsPane').style.pointerEvents = 'none';
 
+      this.map.createPane('companyLandsPane');
+      this.map.getPane('companyLandsPane').style.zIndex = 425;
+      this.map.getPane('companyLandsPane').style.pointerEvents = 'none';
+
       this.map.createPane('roadsPane');
       this.map.getPane('roadsPane').style.zIndex = 430;
       this.map.getPane('roadsPane').style.pointerEvents = 'none';
+
+      // 🌟 TẠO PANE CHO ĐƯỜNG CỐNG (NẰM DƯỚI HỐ GA 450, TRÊN MẶT ĐƯỜNG 430)
+      this.map.createPane('pipesPane');
+      this.map.getPane('pipesPane').style.zIndex = 432;
+      this.map.getPane('pipesPane').style.pointerEvents = 'none';
 
       this.map.createPane('factoriesPane');
       this.map.getPane('factoriesPane').style.zIndex = 440;
@@ -243,15 +324,14 @@ export default {
 
       this.drawBoundaries();
       this.drawPlots();
+      this.drawCompanyLands();
       this.drawGreenery();
       this.drawWaterBodies();
       this.drawRoads();
       this.drawFactories();
       this.drawWastewater();
       this.drawRainwater();
-      this.drawLightingCables();
-      this.drawLightingPoles();
-      this.drawLightingCabinets();
+      this.drawLightingSystem();
       this.drawSurroundingLocations();
 
       if (leafletLayers.boundaries) leafletLayers.boundaries.bringToBack();
@@ -314,13 +394,18 @@ export default {
 
       leafletLayers.plots = L.geoJSON(this.plotsData, {
         interactive: true,
-        style: () => ({
-          fillColor: '#b45309',
-          fillOpacity: 0.35,
-          color: '#f55b02',
-          // dashArray: '4, 4'
-          weight: 1,
-        }),
+        style: (feature) => {
+          const p = feature.properties || {};
+          // Lấy màu từ Database, nếu không có thì fallback theo land_type
+          const plotColor = p.color || (p.land_type === 'commercial' ? '#e11d48' : '#b45309');
+
+          return {
+            fillColor: plotColor,
+            fillOpacity: 0.38,
+            color: plotColor,
+            weight: 1.5,
+          };
+        },
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
           if (p.code) {
@@ -331,22 +416,112 @@ export default {
             });
           }
 
+          const landTypeName = p.land_type === 'commercial' 
+            ? '🏬 Đất Thương mại Dịch vụ' 
+            : '🏭 Đất Công nghiệp';
+
+          const plotColor = p.color || (p.land_type === 'commercial' ? '#e11d48' : '#b45309');
+
           layer.bindPopup(`
-            <div style="font-family: sans-serif; font-size: 13px; min-width: 180px;">
-              <h4 style="margin: 0 0 6px 0; color: #b45309;">🗺️ Lô đất: ${p.code}</h4>
+            <div style="font-family: sans-serif; font-size: 13px; min-width: 200px;">
+              <h4 style="margin: 0 0 6px 0; color: ${plotColor};">🗺️ Lô đất: ${p.code}</h4>
+              <p style="margin: 3px 0;"><b>Loại đất:</b> <span style="font-weight: 700; color: ${plotColor};">${landTypeName}</span></p>
               <p style="margin: 3px 0;"><b>Diện tích:</b> ${p.total_area ? Number(p.total_area).toLocaleString('vi-VN') + ' m²' : '—'}</p>
               <p style="margin: 3px 0;"><b>Mô tả / Trạng thái:</b> ${p.description || 'Chưa có thông tin'}</p>
             </div>
           `);
 
           layer.on({
-            mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.6, weight: 3 }); },
-            mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.4, weight: 1 }); }
+            mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.65, weight: 3 }); },
+            mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.38, weight: 1.5 }); }
           });
         }
       }).addTo(this.map);
 
       this.plotsGeoJsonLayer = leafletLayers.plots;
+    },
+
+    drawCompanyLands() {
+      const data = this.companyLandsData || this.$page?.props?.companyLandsData;
+      if (!data || !data.features || !data.features.length) return;
+
+      // 🌟 Tạo renderer chuyên biệt cho pane này
+      const landRenderer = L.svg({ pane: 'companyLandsPane' });
+
+      leafletLayers.companyLands = L.geoJSON(data, {
+        pane: 'companyLandsPane',
+        renderer: landRenderer, // 🌟 Gán renderer trực tiếp
+        interactive: true,      // 🌟 Bắt buộc có để Leaflet lắng nghe sự kiện
+        style: (feature) => {
+          const p = feature.properties || {};
+          // const compColor = p.company_color || '#003099';
+          const compColor = '#003099';
+
+          return {
+            pane: 'companyLandsPane',
+            fillColor: compColor,
+            fillOpacity: 0.55,
+            color: compColor,
+            weight: 2,
+            dashArray: p.status === 'under_construction' ? '5, 5' : null,
+            interactive: true   // 🌟 Đảm bảo style kích hoạt tương tác
+          };
+        },
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+
+          // 1. Tooltip (Đảm bảo nhãn không chặn click chuột)
+          if (p.land_code) {
+            layer.bindTooltip(`🏢 ${p.company_name || ''}</small>`, {
+              pane: 'tooltipPane',
+              permanent: true,
+              direction: 'center',
+              className: 'company-land-label',
+              interactive: false // 🌟 Không cho phép tooltip nhận sự kiện chuột
+            });
+          }
+
+          // 2. Nội dung Popup
+          const leaseEnd = p.lease_end_date ? new Date(p.lease_end_date).toLocaleDateString('vi-VN') : '---';
+          const areaDisplay = p.leased_area 
+            ? Number(p.leased_area).toLocaleString('vi-VN') + ' m²' 
+            : (p.calculated_area ? Number(p.calculated_area).toLocaleString('vi-VN') + ' m²' : '—');
+
+          layer.bindPopup(`
+            <div style="font-family: sans-serif; font-size: 13px; min-width: 220px;">
+              <h4 style="margin: 0 0 6px 0; color: ${p.company_color || '#0f172a'};">
+                🏢 ${p.company_name || 'Đất Doanh Nghiệp'}
+              </h4>
+              <p style="margin: 3px 0;"><b>Mã thửa đất:</b> <span style="font-family: monospace; font-weight: bold; color: #0284c7;">${p.land_code}</span></p>
+              <p style="margin: 3px 0;"><b>Thuộc lô QH:</b> ${p.plot_code ? 'Lô ' + p.plot_code : 'Chưa gắn'}</p>
+              <p style="margin: 3px 0;"><b>Số bìa đỏ:</b> <span style="color: #b45309; font-weight: bold;">${p.certificate_number || 'Đang cấp đổi/Chưa có'}</span></p>
+              <p style="margin: 3px 0;"><b>Hợp đồng thuê:</b> ${p.contract_number || '---'}</p>
+              <p style="margin: 3px 0;"><b>Thời hạn thuê đến:</b> <b>${leaseEnd}</b></p>
+              <p style="margin: 3px 0;"><b>Diện tích:</b> <b style="color: #059669;">${areaDisplay}</b></p>
+              <p style="margin: 3px 0;"><b>Mục đích XD:</b> ${p.land_purpose || 'Sản xuất công nghiệp'}</p>
+              <p style="margin: 3px 0;"><b>Hiện trạng:</b> ${p.status === 'active' ? '🟢 Đang sản xuất' : '🟡 Đang xây dựng'}</p>
+            </div>
+          `);
+
+          // 3. Sự kiện chuột
+          layer.on({
+            mouseover: (e) => {
+              e.target.setStyle({ fillOpacity: 0.8, weight: 3.5 });
+            },
+            mouseout: (e) => {
+              e.target.setStyle({ fillOpacity: 0.55, weight: 2 });
+            },
+            click: (e) => {
+              // Đưa polygon lên đầu trong pane để viền nổi rõ
+              if (layer.bringToFront) {
+                layer.bringToFront();
+              }
+            }
+          });
+        }
+      });
+
+      this.companyLandsGeoJsonLayer = leafletLayers.companyLands;
     },
 
     drawGreenery() {
@@ -502,44 +677,57 @@ export default {
       const cableWeight = this.getWeightInPixels(1); // Tăng độ dày cáp lên tương đương 1m           // Cáp chiếu sáng (khoảng 0.6m thực tế)
       const cabSize     = this.getCabinetSizeInPixels(2.8, 12, 22); // Tủ điện
 
-      // 2. Co giãn Hố ga nước thải
+      // Co giãn hệ thống Nước thải (cả Cống và Hố ga)
       if (leafletLayers.wastewater) {
-        leafletLayers.wastewater.eachLayer(l => {
-          if (l.setRadius) l.setRadius(wastewaterR);
+        leafletLayers.wastewater.eachLayer((subGroup) => {
+          if (subGroup.eachLayer) {
+            subGroup.eachLayer((layer) => {
+              if (layer.setRadius) layer.setRadius(wastewaterR);
+              if (layer.setStyle && layer.feature && layer.feature.geometry.type.includes('Line')) {
+                layer.setStyle({ weight: this.getPipeWeightInPixels(layer.feature) });
+              }
+            });
+          }
         });
       }
 
-      // 3. Co giãn Hố ga nước mưa
+      // Co giãn hệ thống Nước mưa (cả Cống và Hố ga)
       if (leafletLayers.rainwater) {
-        leafletLayers.rainwater.eachLayer(l => {
-          if (l.setRadius) l.setRadius(rainwaterR);
+        leafletLayers.rainwater.eachLayer((subGroup) => {
+          if (subGroup.eachLayer) {
+            subGroup.eachLayer((layer) => {
+              if (layer.setRadius) layer.setRadius(rainwaterR);
+              if (layer.setStyle && layer.feature && layer.feature.geometry.type.includes('Line')) {
+                layer.setStyle({ weight: this.getPipeWeightInPixels(layer.feature) });
+              }
+            });
+          }
         });
       }
 
-      // 4. Co giãn Cột đèn chiếu sáng
-      if (leafletLayers.lightingPoles) {
-        leafletLayers.lightingPoles.eachLayer(l => {
-          if (l.setRadius) l.setRadius(poleR);
-        });
-      }
-
-      // 5. Co giãn Tuyến cáp chiếu sáng (LineString)
-      if (leafletLayers.lightingCables) {
-        leafletLayers.lightingCables.eachLayer(l => {
-          if (l.setStyle) l.setStyle({ weight: Math.max(1.5, Math.min(4, cableWeight)) });
-        });
-      }
-
-      // 6. Co giãn Icon Tủ điện (Point Marker)
-      if (leafletLayers.lightingCabinets) {
-        leafletLayers.lightingCabinets.eachLayer(l => {
-          if (l.setIcon) {
-            l.setIcon(L.divIcon({
-              className: 'custom-cabinet-marker',
-              html: `<div class="cabinet-icon-box" style="width: ${cabSize}px; height: ${cabSize}px; font-size: ${Math.round(cabSize * 0.55)}px;" title="${l.feature?.properties?.code || ''}">⚡</div>`,
-              iconSize: [cabSize, cabSize],
-              iconAnchor: [Math.round(cabSize / 2), Math.round(cabSize / 2)]
-            }));
+      // 🌟 Co giãn toàn bộ hệ thống chiếu sáng (Cáp, Cột đèn, Tủ điện)
+      if (leafletLayers.lightingSystem) {
+        leafletLayers.lightingSystem.eachLayer((subGroup) => {
+          if (subGroup.eachLayer) {
+            subGroup.eachLayer((l) => {
+              // Cột đèn (CircleMarker)
+              if (l.setRadius) {
+                l.setRadius(poleR);
+              }
+              // Tuyến cáp (LineString Polyline)
+              if (l.setStyle && l.feature && l.feature.geometry.type.includes('Line')) {
+                l.setStyle({ weight: Math.max(1.5, Math.min(4, cableWeight)) });
+              }
+              // Tủ điện (DivIcon Marker)
+              if (l.setIcon && l.feature && l.feature.geometry.type === 'Point') {
+                l.setIcon(L.divIcon({
+                  className: 'custom-cabinet-marker',
+                  html: `<div class="cabinet-icon-box" style="width: ${cabSize}px; height: ${cabSize}px; font-size: ${Math.round(cabSize * 0.55)}px;" title="${l.feature?.properties?.code || ''}">⚡</div>`,
+                  iconSize: [cabSize, cabSize],
+                  iconAnchor: [Math.round(cabSize / 2), Math.round(cabSize / 2)]
+                }));
+              }
+            });
           }
         });
       }
@@ -548,13 +736,19 @@ export default {
     drawFactories() {
       if (!this.factoriesData || !this.factoriesData.features) return;
 
+      // 🌟 1. Khởi tạo Renderer riêng biệt gắn chặt vào factoriesPane
+      const factoryRenderer = L.svg({ pane: 'factoriesPane' });
+
       leafletLayers.factories = L.geoJSON(this.factoriesData, {
+        pane: 'factoriesPane',       // 🌟 2. Chỉ định rõ pane cấp layer
+        renderer: factoryRenderer,
         interactive: true,
         style: (feature) => {
           const p = feature.properties;
           if (p.status === 'rented' && (p.company_color || p.color)) {
             const customColor = p.company_color || p.color;
             return {
+              pane: 'factoriesPane',
               fillColor: customColor,
               color: customColor,
               fillOpacity: 0.65,
@@ -592,7 +786,7 @@ export default {
       this.factoriesGeoJsonLayer = leafletLayers.factories;
     },
 
-    drawWastewater() {
+    /*drawWastewater() {
       if (!this.wastewaterManholesData || !this.wastewaterManholesData.features) return;
 
       leafletLayers.wastewater = L.geoJSON(this.wastewaterManholesData, {
@@ -631,9 +825,135 @@ export default {
           });
         }
       });
+    },*/
+
+    // 🧪 VẼ HỆ THỐNG NƯỚC THẢI (GỒM CỐNG D400 + MŨI TÊN + HỐ GA)
+    drawWastewater() {
+      const pipeRenderer = L.svg({ pane: 'pipesPane' });
+      const layers = [];
+
+      // 1. TÁCH DỮ LIỆU ĐƯỜNG CỐNG NƯỚC THẢI
+      const wastePipes = {
+        type: 'FeatureCollection',
+        features: (this.drainagePipesData?.features || []).filter(f => f.properties.pipe_type === 'wastewater')
+      };
+
+      if (wastePipes.features.length) {
+        const pipeLayer = L.geoJSON(wastePipes, {
+          pane: 'pipesPane',
+          renderer: pipeRenderer,
+          interactive: true,
+          style: (feature) => ({
+            pane: 'pipesPane',
+            color: '#9333ea', // Màu tím chuẩn nhận diện nước thải
+            weight: this.getPipeWeightInPixels(feature),
+            opacity: 0.95,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }),
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            const spec = p.cross_section === 'circular' ? `D${p.diameter || '---'} mm` : `Hộp ${p.width}x${p.height} mm`;
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 200px; font-family: sans-serif;">
+                <h4 style="margin: 0 0 6px 0; color: #9333ea;">🧪 TUYẾN THU GOM NƯỚC THẢI</h4>
+                <p style="margin: 3px 0;"><b>Mã cống:</b> <span style="color:#0284c7; font-weight:bold;">${p.code}</span></p>
+                <p style="margin: 3px 0;"><b>Tên đoạn:</b> ${p.name || '---'}</p>
+                <p style="margin: 3px 0;"><b>Quy cách:</b> ${spec} (${p.material || 'HDPE 2 vách'})</p>
+                <p style="margin: 3px 0;"><b>Dòng chảy:</b> ${p.start_manhole_code} ➔ ${p.end_manhole_code}</p>
+                <p style="margin: 3px 0;"><b>Cốt đáy:</b> ${p.invert_start_elevation || '---'}m ➔ ${p.invert_end_elevation || '---'}m</p>
+                <p style="margin: 3px 0;"><b>Độ dốc i:</b> <b style="color:#059669;">${p.slope ? p.slope + '%' : '---'}</b></p>
+                <p style="margin: 3px 0;"><b>Chiều dài:</b> ${p.length_m ? p.length_m + ' m' : '---'}</p>
+              </div>
+            `);
+            layer.on({
+              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 3 }); },
+              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) }); }
+            });
+          }
+        });
+
+        layers.push(pipeLayer);
+
+        // 2. VẼ MŨI TÊN DÒNG CHẢY NƯỚC THẢI
+        if (typeof L.polylineDecorator === 'function') {
+          const arrowDecors = [];
+          pipeLayer.eachLayer((pLayer) => {
+            if (pLayer instanceof L.Polyline) {
+              const arrow = L.polylineDecorator(pLayer, {
+                patterns: [{
+                  offset: '20px',
+                  repeat: '70px',
+                  symbol: L.Symbol.arrowHead({
+                    pixelSize: 6,
+                    polygon: true,
+                    pathOptions: {
+                      pane: 'pipesPane',
+                      fillColor: '#581c87',
+                      fillOpacity: 1,
+                      color: '#ffffff',
+                      weight: 1
+                    }
+                  })
+                }]
+              });
+              arrowDecors.push(arrow);
+            }
+          });
+          if (arrowDecors.length) {
+            layers.push(L.featureGroup(arrowDecors));
+          }
+        }
+      }
+
+      // 3. VẼ HỐ GA NƯỚC THẢI (Nổi lên trên pointsPane)
+      if (this.wastewaterManholesData?.features?.length) {
+        const manholeLayer = L.geoJSON(this.wastewaterManholesData, {
+          pane: 'pointsPane',
+          interactive: true,
+          pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, {
+              pane: 'pointsPane',
+              radius: this.getPointRadiusInPixels(1.5, 2, 5.5),
+              fillColor: '#800080',
+              color: '#ffffff',
+              weight: 1.5,
+              opacity: 0.9,
+              fillOpacity: 0.9
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            const lat = layer.getLatLng().lat;
+            const lng = layer.getLatLng().lng;
+
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 180px;">
+                <b style="color: #800080;">🧪 Hố Ga Nước Thải</b><br>
+                <b>Mã:</b> ${props.code}<br>
+                <b>DN:</b> ${props.company_name || 'Chưa gắn'}<br>
+                <b>Độ sâu:</b> ${props.depth || 'N/A'} m<br>
+                <hr style="margin: 6px 0; border: none; border-top: 1px dashed #ccc;">
+                <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
+                  🧭 Chỉ đường (Google Maps)
+                </a>
+              </div>
+            `);
+            layer.on({
+              mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
+              mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
+            });
+          }
+        });
+
+        layers.push(manholeLayer);
+      }
+
+      // Gộp chung toàn bộ thành 1 FeatureGroup
+      leafletLayers.wastewater = L.featureGroup(layers);
     },
 
-    drawRainwater() {
+    /*drawRainwater() {
       if (!this.rainwaterManholesData || !this.rainwaterManholesData.features) return;
 
       leafletLayers.rainwater = L.geoJSON(this.rainwaterManholesData, {
@@ -672,45 +992,250 @@ export default {
           });
         }
       });
+    },*/
+
+    // 🌧️ VẼ HỆ THỐNG NƯỚC MƯA (GỒM CỐNG HỘP/D800 + MŨI TÊN + HỐ GA)
+    drawRainwater() {
+      const pipeRenderer = L.svg({ pane: 'pipesPane' });
+      const layers = [];
+
+      // 1. TÁCH DỮ LIỆU ĐƯỜNG CỐNG NƯỚC MƯA
+      const rainPipes = {
+        type: 'FeatureCollection',
+        features: (this.drainagePipesData?.features || []).filter(f => f.properties.pipe_type === 'rainwater')
+      };
+
+      if (rainPipes.features.length) {
+        const pipeLayer = L.geoJSON(rainPipes, {
+          pane: 'pipesPane',
+          renderer: pipeRenderer,
+          interactive: true,
+          style: (feature) => ({
+            pane: 'pipesPane',
+            color: '#0284c7', // Màu xanh lam nhận diện nước mưa
+            weight: this.getPipeWeightInPixels(feature),
+            opacity: 0.95,
+            lineCap: 'round',
+            lineJoin: 'round'
+          }),
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            const spec = p.cross_section === 'circular' ? `D${p.diameter || '---'} mm` : `Hộp ${p.width}x${p.height} mm`;
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 200px; font-family: sans-serif;">
+                <h4 style="margin: 0 0 6px 0; color: #0284c7;">🌧️ TUYẾN THOÁT NƯỚC MƯA</h4>
+                <p style="margin: 3px 0;"><b>Mã cống:</b> <span style="color:#0284c7; font-weight:bold;">${p.code}</span></p>
+                <p style="margin: 3px 0;"><b>Tên đoạn:</b> ${p.name || '---'}</p>
+                <p style="margin: 3px 0;"><b>Quy cách:</b> ${spec} (${p.material || 'BTCT'})</p>
+                <p style="margin: 3px 0;"><b>Dòng chảy:</b> ${p.start_manhole_code} ➔ ${p.end_manhole_code}</p>
+                <p style="margin: 3px 0;"><b>Cốt đáy:</b> ${p.invert_start_elevation || '---'}m ➔ ${p.invert_end_elevation || '---'}m</p>
+                <p style="margin: 3px 0;"><b>Độ dốc i:</b> <b style="color:#059669;">${p.slope ? p.slope + '%' : '---'}</b></p>
+                <p style="margin: 3px 0;"><b>Chiều dài:</b> ${p.length_m ? p.length_m + ' m' : '---'}</p>
+              </div>
+            `);
+            layer.on({
+              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 3 }); },
+              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) }); }
+            });
+          }
+        });
+
+        layers.push(pipeLayer);
+
+        // 2. VẼ MŨI TÊN DÒNG CHẢY NƯỚC MƯA
+        if (typeof L.polylineDecorator === 'function') {
+          const arrowDecors = [];
+          pipeLayer.eachLayer((pLayer) => {
+            if (pLayer instanceof L.Polyline) {
+              const arrow = L.polylineDecorator(pLayer, {
+                patterns: [{
+                  offset: '20px',
+                  repeat: '70px',
+                  symbol: L.Symbol.arrowHead({
+                    pixelSize: 6,
+                    polygon: true,
+                    pathOptions: {
+                      pane: 'pipesPane',
+                      fillColor: '#0369a1',
+                      fillOpacity: 1,
+                      color: '#ffffff',
+                      weight: 1
+                    }
+                  })
+                }]
+              });
+              arrowDecors.push(arrow);
+            }
+          });
+          if (arrowDecors.length) {
+            layers.push(L.featureGroup(arrowDecors));
+          }
+        }
+      }
+
+      // 3. VẼ HỐ GA NƯỚC MƯA (Nổi lên trên pointsPane)
+      if (this.rainwaterManholesData?.features?.length) {
+        const manholeLayer = L.geoJSON(this.rainwaterManholesData, {
+          pane: 'pointsPane',
+          interactive: true,
+          pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, {
+              pane: 'pointsPane',
+              radius: this.getPointRadiusInPixels(1.3, 2, 5.0),
+              fillColor: '#007bff',
+              color: '#ffffff',
+              weight: 1.5,
+              opacity: 0.9,
+              fillOpacity: 0.9
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            const lat = layer.getLatLng().lat;
+            const lng = layer.getLatLng().lng;
+
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 180px;">
+                <b style="color: #007bff;">🌧️ Hố Ga Nước Mưa</b><br>
+                <b>Mã:</b> ${props.code}<br>
+                <b>DN:</b> ${props.company_name || 'Chưa gắn'}<br>
+                <b>Nắp:</b> ${props.cover_material || 'N/A'}<br>
+                <hr style="margin: 6px 0; border: none; border-top: 1px dashed #ccc;">
+                <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
+                  🧭 Chỉ đường (Google Maps)
+                </a>
+              </div>
+            `);
+            layer.on({
+              mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
+              mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
+            });
+          }
+        });
+
+        layers.push(manholeLayer);
+      }
+
+      // Gộp chung toàn bộ thành 1 FeatureGroup
+      leafletLayers.rainwater = L.featureGroup(layers);
     },
 
+    //  hàm tính độ dày đường cống
+    getPipeWeightInPixels(feature) {
+      if (!this.map) return 2.5;
+      const p = feature.properties || {};
+
+      let sizeInMeters = 0.35; // Mặc định D350 = 0.35m
+      if (p.cross_section === 'box' && p.width) {
+        sizeInMeters = p.width / 1000;
+      } else if (p.diameter) {
+        sizeInMeters = p.diameter / 1000;
+      }
+
+      const zoom = this.map.getZoom();
+      const lat = this.map.getCenter().lat;
+      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+
+      const calcPx = sizeInMeters / metersPerPixel;
+
+      // 🌟 KHÓA BIÊN ĐỘ: Không quá 12px khi zoom gần, không dưới 1.5px khi zoom xa
+      return Math.min(12, Math.max(1.5, calcPx));
+    },
+
+    //  Hàm vẽ chú thích
     addMapLegend() {
       const legend = L.control({ position: 'bottomleft' });
 
       legend.onAdd = () => {
-        const div = L.DomUtil.create('div', 'custom-map-legend');
+        const div = L.DomUtil.create('div', 'custom-map-legend collapsed');
+        div.id = 'map-legend-box';
+
         div.innerHTML = `
-          <div class="legend-header">📌 CHÚ THÍCH BẢN ĐỒ</div>
-          <div class="legend-list">
+          <!-- 1. NÚT HEADER ĐIỀU KHIỂN BẬT / TẮT (TOGGLE) -->
+          <div class="legend-header" id="legend-toggle-btn" title="Click để ẩn/hiện chú thích">
+            <div class="legend-header-title">
+              <span class="legend-header-icon">📌</span>
+              <span class="legend-title-text">CHÚ THÍCH BẢN ĐỒ</span>
+            </div>
+            <span class="legend-toggle-arrow">▲</span>
+          </div>
+
+          <!-- 2. NỘI DUNG CHÚ THÍCH ĐẦY ĐỦ CÁC HẠ TẦNG -->
+          <div class="legend-content">
+            <!-- NHÓM QUY HOẠCH & ĐẤT ĐAI -->
+            <div class="legend-group-title">QUY HOẠCH & XÂY DỰNG</div>
+            <div class="legend-item">
+              <span class="legend-line boundary-line"></span>
+              <span class="legend-text">Ranh giới quy hoạch</span>
+            </div>
+           <div class="legend-item">
+              <span class="legend-box" style="background-color: #b45309; opacity: 0.7; border: 1px solid #f55b02;"></span>
+              <span class="legend-text">Đất công nghiệp</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-box" style="background-color: #e11d48; opacity: 0.7; border: 1px solid #be123c;"></span>
+              <span class="legend-text">Đất thương mại dịch vụ</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-box" style="background-color: #003099; opacity: 0.6; border: 1.5px solid #003099;"></span>
+              <span class="legend-text">Đất doanh nghiệp thuê</span>
+            </div>
+
+            <!-- NHÓM CẢNH QUAN & GIAO THÔNG -->
+            <div class="legend-group-title">GIAO THÔNG & CẢNH QUAN</div>
+            <div class="legend-item">
+              <span class="legend-line road-line"></span>
+              <span class="legend-text">Đường nội bộ KCN</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-box greenery-box"></span>
+              <span class="legend-text">Khuôn viên cây xanh</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-box water-box"></span>
+              <span class="legend-text">Mặt nước / Kênh điều hòa</span>
+            </div>
+
+            <!-- NHÓM THOÁT NƯỚC (HỐ GA + CỐNG) -->
+            <div class="legend-group-title">HỆ THỐNG THOÁT NƯỚC</div>
             <div class="legend-item">
               <span class="legend-point rainwater-point"></span>
-              <span class="legend-text">Hố ga nước mưa</span>
+              <span class="legend-line rain-pipe-line"></span>
+              <span class="legend-text">Cống & Hố ga nước mưa</span>
             </div>
             <div class="legend-item">
               <span class="legend-point wastewater-point"></span>
-              <span class="legend-text">Hố ga nước thải</span>
+              <span class="legend-line waste-pipe-line"></span>
+              <span class="legend-text">Cống & Hố ga nước thải</span>
             </div>
+
+            <!-- NHÓM HỆ THỐNG CHIẾU SÁNG -->
+            <div class="legend-group-title">HỆ THỐNG CHIẾU SÁNG</div>
             <div class="legend-item">
-              <span style="border-top: 3px dashed #e11d48; width: 16px; display: inline-block;"></span>
-              <span class="legend-text">Ranh giới quy hoạch</span>
-            </div>
-            <div class="legend-item">
-              <span style="background-color: #d97706; width: 10px; height: 10px; border-radius: 2px; border: 1.5px solid #fff; display: inline-block;"></span>
+              <span class="legend-icon-mini">⚡</span>
               <span class="legend-text">Tủ điện chiếu sáng</span>
             </div>
             <div class="legend-item">
-              <span style="background-color: #eab308; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #fff; display: inline-block;"></span>
-              <span class="legend-text">Cột đèn chiếu sáng</span>
+              <span class="legend-point pole-point"></span>
+              <span class="legend-text">Cột đèn chiếu sáng LED</span>
             </div>
             <div class="legend-item">
-              <span style="border-top: 3px solid #f59e0b; width: 16px; display: inline-block;"></span>
-              <span class="legend-text">Tuyến cáp ngầm CS</span>
+              <span class="legend-line cable-line"></span>
+              <span class="legend-text">Tuyến cáp điện ngầm</span>
             </div>
           </div>
         `;
 
+        // Chặn nổi bọt sự kiện để khi click vào legend không kích hoạt click lên bản đồ
         L.DomEvent.disableClickPropagation(div);
         L.DomEvent.disableScrollPropagation(div);
+
+        // Bắt sự kiện Toggle khi click vào header
+        const toggleBtn = div.querySelector('#legend-toggle-btn');
+        L.DomEvent.on(toggleBtn, 'click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          div.classList.toggle('collapsed');
+        });
 
         return div;
       };
@@ -725,6 +1250,7 @@ export default {
       const layersToCheck = [
         { layer: this.roadsGeoJsonLayer, minZoom: 17, maxZoom: 20},
         { layer: this.plotsGeoJsonLayer, minZoom: 17, maxZoom: 18},
+        { layer: this.companyLandsGeoJsonLayer, minZoom: 18, maxZoom: 20},
         { layer: this.factoriesGeoJsonLayer, minZoom: 18, maxZoom: 20}
       ];
 
@@ -774,7 +1300,7 @@ export default {
           }
         } else {
           // Chỉ thêm vào map nếu mức zoom hiện tại >= 16 (với các lớp chi tiết)
-          const detailLayers = ['lightingCabinets', 'lightingCables', 'lightingPoles', 'wastewater', 'rainwater'];
+          const detailLayers = ['lightingSystem', 'wastewater', 'rainwater'];
           const currentZoom = this.map.getZoom();
 
           if (!detailLayers.includes(name) || currentZoom >= 16) {
@@ -830,9 +1356,7 @@ export default {
 
       // Danh sách 5 lớp hạ tầng chi tiết cần ẩn/hiện theo zoom
       const detailLayerKeys = [
-        'lightingCabinets',
-        'lightingCables',
-        'lightingPoles',
+        'lightingSystem', // 🌟 Quản lý toàn bộ mạng chiếu sáng
         'wastewater',
         'rainwater'
       ];
@@ -1002,7 +1526,7 @@ export default {
     },
 
     // ⚡ 1. VẼ TỦ ĐIỆN CHIẾU SÁNG (Point - Hình vuông cam nổi bật)
-    drawLightingCabinets() {
+    /*drawLightingCabinets() {
       const initCabSize = this.getCabinetSizeInPixels(1.8, 12, 22);
 
       if (!this.lightingCabinetsData?.features?.length) return;
@@ -1148,6 +1672,152 @@ export default {
           });
         }
       });
+    },*/
+
+    // ⚡ VẼ TOÀN BỘ HỆ THỐNG CHIẾU SÁNG (TỦ ĐIỆN + TUYẾN CÁP + CỘT ĐÈN)
+    drawLightingSystem() {
+      const layers = [];
+      const initCabSize = this.getCabinetSizeInPixels(1.8, 12, 22);
+
+      // 1. TUYẾN CÁP CHIẾU SÁNG (LineString - Nằm ở lightingCablesPane: zIndex 435)
+      if (this.lightingCablesData?.features?.length) {
+        const cableRenderer = L.svg({ pane: 'lightingCablesPane' });
+
+        const cablesLayer = L.geoJSON(this.lightingCablesData, {
+          pane: 'lightingCablesPane',
+          renderer: cableRenderer,
+          interactive: true,
+          style: (feature) => {
+            const isFault = feature.properties.status === 'fault';
+            return {
+              pane: 'lightingCablesPane',
+              color: isFault ? '#ef4444' : '#f59e0b',
+              weight: Math.max(1.5, Math.min(4, this.getWeightInPixels(0.6))),
+              dashArray: feature.properties.installation_type === 'overhead' ? '6, 6' : null,
+              opacity: 0.95
+            };
+          },
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 210px; font-family: sans-serif;">
+                <h4 style="margin: 0 0 6px 0; color: #f59e0b;">〰️ TUYẾN CÁP CHIẾU SÁNG</h4>
+                <p style="margin: 3px 0;"><b>Mã lộ:</b> <span style="color:#0284c7; font-weight:bold;">${p.code}</span></p>
+                <p style="margin: 3px 0;"><b>Tên tuyến:</b> ${p.name || '---'}</p>
+                <p style="margin: 3px 0;"><b>Quy cách:</b> ${p.cable_spec || 'Cu/XLPE 4x16mm2'}</p>
+                <p style="margin: 3px 0;"><b>Lắp đặt:</b> ${p.installation_type === 'underground' ? '🚇 Cáp ngầm hào' : '🪢 Cáp treo'}</p>
+                <p style="margin: 3px 0;"><b>Chiều dài:</b> <b style="color:#0284c7;">${p.length_m || '—'} m</b></p>
+                <p style="margin: 3px 0;"><b>Tình trạng:</b> ${p.status === 'normal' ? '🟢 Bình thường' : '🔴 Sự cố'}</p>
+              </div>
+            `);
+
+            layer.on({
+              mouseover: (e) => { e.target.setStyle({ weight: 6, color: '#fbbf24', opacity: 1 }); },
+              mouseout: (e) => {
+                const isFault = feature.properties.status === 'fault';
+                e.target.setStyle({ weight: 4, color: isFault ? '#ef4444' : '#f59e0b', opacity: 0.95 });
+              }
+            });
+          }
+        });
+
+        layers.push(cablesLayer);
+      }
+
+      // 2. CỘT ĐÈN CHIẾU SÁNG (Point - Nằm ở lightingPointsPane: zIndex 460)
+      if (this.lightingPolesData?.features?.length) {
+        const poleRenderer = L.svg({ pane: 'lightingPointsPane' });
+
+        const polesLayer = L.geoJSON(this.lightingPolesData, {
+          pane: 'lightingPointsPane',
+          renderer: poleRenderer,
+          interactive: true,
+          pointToLayer: (feature, latlng) => {
+            const isBroken = feature.properties.status === 'broken';
+            return L.circleMarker(latlng, {
+              pane: 'lightingPointsPane',
+              renderer: poleRenderer,
+              interactive: true,
+              radius: this.getPointRadiusInPixels(1.2, 1.8, 5.0),
+              fillColor: isBroken ? '#ef4444' : '#eab308',
+              color: '#ffffff',
+              weight: 2,
+              opacity: 1,
+              fillOpacity: 0.95
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            const lat = layer.getLatLng().lat;
+            const lng = layer.getLatLng().lng;
+
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 190px; font-family: sans-serif;">
+                <h4 style="margin: 0 0 6px 0; color: #ca8a04;">💡 CỘT ĐÈN CHIẾU SÁNG</h4>
+                <p style="margin: 3px 0;"><b>Mã cột:</b> <span style="color:#ca8a04; font-weight:bold;">${p.code}</span></p>
+                <p style="margin: 3px 0;"><b>Chiều cao:</b> ${p.height_m || 8} m (${p.arm_type || 'Cần đơn'})</p>
+                <p style="margin: 3px 0;"><b>Loại bóng:</b> ${p.lamp_type || 'LED'} - <b>${p.wattage || 150}W</b></p>
+                <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'working' ? '🟢 Sáng tốt' : (p.status === 'broken' ? '🔴 Hỏng bóng' : '🟡 Bảo dưỡng')}</p>
+                <hr style="margin: 6px 0; border: none; border-top: 1px dashed #cbd5e1;">
+                <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
+                  🧭 Chỉ đường tới cột đèn
+                </a>
+              </div>
+            `);
+
+            layer.on({
+              mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
+              mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
+            });
+          }
+        });
+
+        layers.push(polesLayer);
+      }
+
+      // 3. TỦ ĐIỆN CHIẾU SÁNG (Point DivIcon - Nằm ở lightingPointsPane: zIndex 460)
+      if (this.lightingCabinetsData?.features?.length) {
+        const cabinetsLayer = L.geoJSON(this.lightingCabinetsData, {
+          pane: 'lightingPointsPane',
+          interactive: true,
+          pointToLayer: (feature, latlng) => {
+            return L.marker(latlng, {
+              pane: 'lightingPointsPane',
+              icon: L.divIcon({
+                className: 'custom-cabinet-marker',
+                html: `<div class="cabinet-icon-box" style="width: ${initCabSize}px; height: ${initCabSize}px; font-size: ${Math.round(initCabSize * 0.55)}px;" title="${feature.properties.code}">⚡</div>`,
+                iconSize: [initCabSize, initCabSize],
+                iconAnchor: [Math.round(initCabSize / 2), Math.round(initCabSize / 2)]
+              })
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            const lat = layer.getLatLng().lat;
+            const lng = layer.getLatLng().lng;
+
+            layer.bindPopup(`
+              <div style="font-size: 13px; min-width: 200px; font-family: sans-serif;">
+                <h4 style="margin: 0 0 6px 0; color: #d97706;">⚡ TỦ ĐIỆN CHIẾU SÁNG</h4>
+                <p style="margin: 3px 0;"><b>Mã tủ:</b> <span style="color:#d97706; font-weight:bold;">${p.code}</span></p>
+                <p style="margin: 3px 0;"><b>Tên tủ:</b> ${p.name || '---'}</p>
+                <p style="margin: 3px 0;"><b>Công suất:</b> ${p.capacity_kva ? p.capacity_kva + ' kVA' : '—'}</p>
+                <p style="margin: 3px 0;"><b>Chế độ:</b> ${p.control_type === 'timer' ? '⏱️ Hẹn giờ' : (p.control_type === 'photocell' ? '☀️ Cảm biến quang' : '📡 Smart IoT')}</p>
+                <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'active' ? '🟢 Đang hoạt động' : '🔴 Ngừng cấp'}</p>
+                <hr style="margin: 6px 0; border: none; border-top: 1px dashed #cbd5e1;">
+                <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
+                  🧭 Chỉ đường tới tủ điện
+                </a>
+              </div>
+            `);
+          }
+        });
+
+        layers.push(cabinetsLayer);
+      }
+
+      // 🌟 Đóng gói tất cả vào 1 FeatureGroup duy nhất
+      leafletLayers.lightingSystem = L.featureGroup(layers);
     },
 
     // 📍 VẼ CÁC VÙNG PHỤ CẬN LÂN CẬN (DÙNG CHÍNH CIRCLEMARKER ĐỂ KHÓA TỌA ĐỘ 100%)
@@ -1222,6 +1892,23 @@ export default {
       }
     },
 
+    getFlag(country) {
+      const flags = {
+        'Hàn Quốc': '🇰🇷',
+        'Trung Quốc': '🇨🇳',
+        'Việt Nam': '🇻🇳',
+        'Đài Loan': '🇹🇼',
+        'Nhật Bản': '🇯🇵',
+        'Singapore': '🇸🇬'
+      };
+      return flags[country] || '🌐';
+    },
+    
+    formatNumber(val) {
+      if (!val) return '0';
+      return Number(val).toLocaleString('vi-VN');
+    },
+
     getGoogleMapsUrl(lat, lng) {
       return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     }
@@ -1253,96 +1940,234 @@ export default {
   z-index: 1;
 }
 
+/* KHUNG PANEL CHÍNH - TỰ ĐỘNG CHUYỂN DẠNG BOTTOM-SHEET TRÊN MOBILE */
+/* KHUNG PANEL CHÍNH */
 .factory-info-panel {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 320px;
-  max-height: calc(100dvh - 100px);
+  top: 16px;
+  right: 16px;
+  width: 330px; /* Tăng nhẹ độ rộng để chữ to không bị tràn dòng */
+  max-width: calc(100vw - 32px);
   background: #ffffff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  z-index: 1000;
-  padding: 18px;
-  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  z-index: 2000;
+  overflow: hidden;
+  font-family: inherit;
+  border: 1px solid #e2e8f0;
+  font-size: 13px; /* 🌟 Tăng từ 11px lên 13px */
+  color: #334155;
 }
 
-.panel-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.factory-code { margin: 5px 0 0 0; font-size: 16px; }
-.close-btn { border: none; background: #f1f5f9; padding: 6px 10px; border-radius: 50%; cursor: pointer; font-weight: bold; }
-.badge { display: inline-block; padding: 3px 8px; border-radius: 4px; color: #fff; font-size: 11px; font-weight: bold; }
-.badge.rented { background-color: #dc3545; }
-.badge.available { background-color: #28a745; }
-.badge.under_construction { background-color: #ffc107; color: #000; }
-.phone-link { color: #0d6efd; text-decoration: none; font-weight: bold; }
+/* HEADER */
+.panel-header {
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.header-badges {
+  display: flex;
+  gap: 6px;
+}
+.badge {
+  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.badge.rented, .badge.active { background: #dcfce7; color: #15803d; }
+.badge.empty, .badge.vacant { background: #fee2e2; color: #b91c1c; }
+.badge-plot {
+  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #b45309;
+}
+.factory-code {
+  margin: 0;
+  font-size: 14.5px; /* 🌟 Tăng từ 13px lên 14.5px */
+  font-weight: 800;
+  color: #0f172a;
+}
 
-/* 🎯 NÚT ĐỊNH VỊ CÓ TÍNH TỚI VÙNG AN TOÀN SAFE-AREA */
-.locate-btn {
-  position: absolute;
-  bottom: calc(105px + env(safe-area-inset-bottom, 0px));
-  right: 18px;
-  z-index: 1000;
-  width: 42px;
-  height: 42px;
-  background: #ffffff;
-  border: 2px solid rgba(0, 0, 0, 0.2);
+/* CỤM NÚT GÓC PHẢI */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.icon-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  font-size: 15px; /* 🌟 Tăng icon từ 13px lên 15px */
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+.icon-nav-btn:hover {
+  background: #dbeafe;
+  transform: scale(1.08);
+}
+.close-btn {
+  border: none;
+  background: #f1f5f9;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  font-size: 18px;
+  font-size: 13px; /* 🌟 Tăng từ 11px lên 13px */
+  cursor: pointer;
+  color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s ease;
 }
-:deep(.leaflet-control-attribution){
-  display: none;
+.close-btn:hover { background: #e2e8f0; color: #0f172a; }
+
+/* BODY */
+.panel-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 75vh;
+  overflow-y: auto;
 }
 
-.locate-btn:hover { background: #f4f4f4; transform: scale(1.05); }
-.locate-btn:active { transform: scale(0.95); }
+/* KHỐI DOANH NGHIỆP */
+.company-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 8px;
+}
+.company-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.company-name {
+  margin: 0;
+  font-size: 13.5px; /* 🌟 Tăng từ 12px lên 13.5px */
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+}
+.meta-tags {
+  display: flex;
+  gap: 6px;
+  margin-left: 18px;
+  flex-wrap: wrap;
+}
+.tag {
+  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+}
+.tag-country { background: #eff6ff; color: #1e40af; font-weight: 600; }
 
-@media (max-width: 768px) {
+/* LƯỚI THÔNG TIN CHI TIẾT */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  background: #fafafa;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+.info-item.full-width {
+  grid-column: span 2;
+}
+.label {
+  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  color: #64748b;
+  font-weight: 600;
+}
+.value {
+  font-size: 12.5px; /* 🌟 Tăng từ 10.5px lên 12.5px */
+  color: #1e293b;
+  font-weight: 600;
+}
+.text-highlight { color: #047857; font-weight: 800; }
+.font-mono { font-family: monospace; font-size: 12px; }
+
+/* LIÊN HỆ & GHI CHÚ */
+.contact-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+.contact-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.contact-link {
+  font-size: 12px; /* 🌟 Tăng từ 10px lên 12px */
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+.contact-link:hover { text-decoration: underline; }
+.notes-text {
+  margin: 0;
+  font-size: 11.5px; /* 🌟 Tăng từ 9.5px lên 11.5px */
+  color: #475569;
+  line-height: 1.4;
+  background: #fffbeb;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #fef3c7;
+}
+
+/* TỐI ƯU GIAO DIỆN DI ĐỘNG */
+@media (max-width: 640px) {
   .factory-info-panel {
     top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 60vh;
-    border-radius: 16px 16px 0 0;
-    box-sizing: border-box;
-    /* Dán padding-bottom cẩn thận để không bị thanh Home Indicator che */
-    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    bottom: 12px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    border-radius: 14px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18);
   }
-}
-
-:deep(.directions-btn) {
-  display: inline-block;
-  width: 100%;
-  text-align: center;
-  padding: 6px 10px;
-  background-color: #10b981;
-  color: #ffffff !important;
-  text-decoration: none;
-  font-weight: bold;
-  font-size: 12px;
-  border-radius: 6px;
-  box-sizing: border-box;
-}
-
-.directions-btn-block {
-  display: block;
-  text-align: center;
-  padding: 10px;
-  background-color: #10b981;
-  color: #ffffff !important;
-  text-decoration: none;
-  font-weight: bold;
-  font-size: 13px;
-  border-radius: 8px;
-  margin: 10px 0;
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  .panel-body {
+    max-height: 52vh;
+  }
 }
 
 /* STYLES CHO CÁC LOẠI NHÃN TRÊN BẢN ĐỒ */
@@ -1413,58 +2238,240 @@ export default {
   margin-right: 12px !important;
 }
 
+/* =============================================================================
+ * BẢNG CHÚ THÍCH BẢN ĐỒ TỐI ƯU CHO CẢ DESKTOP & MOBILE (RESPONSIVE TOUCH)
+ * ============================================================================= */
+
+/* Khung chứa Control góc dưới bên trái của Leaflet */
+.leaflet-bottom.leaflet-left {
+  z-index: 999 !important;
+  margin-left: 12px !important;
+  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Khung bảng chú thích tổng */
 .custom-map-legend {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(6px) !important;
-  padding: 8px 12px !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
-  border: 1px solid #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(203, 213, 225, 0.9) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-  min-width: 140px !important;
-  display: block !important;
-  visibility: visible !important;
+  width: 230px !important;
+  max-width: calc(100vw - 80px) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  overflow: hidden !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
 }
 
-.custom-map-legend .legend-header {
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  color: #0f172a !important;
-  margin-bottom: 6px !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  padding-bottom: 4px !important;
-  letter-spacing: 0.5px !important;
-  text-transform: uppercase !important;
+/* TRẠNG THÁI THU GỌN (MẶC ĐỊNH) */
+.custom-map-legend.collapsed {
+  width: auto !important;
+  border-radius: 24px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22) !important;
 }
 
-.custom-map-legend .legend-list {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 5px !important;
+.custom-map-legend.collapsed .legend-content {
+  display: none !important;
 }
 
-.custom-map-legend .legend-item {
+.custom-map-legend.collapsed .legend-header {
+  border-bottom: none !important;
+  padding: 8px 14px !important;
+  background: transparent !important;
+}
+
+.custom-map-legend.collapsed .legend-toggle-arrow {
+  transform: rotate(180deg) !important;
+}
+
+/* THANH HEADER ĐIỀU KHIỂN TOGGLE (CHUẨN VÙNG CHẠM TOUCH 40PX) */
+.legend-header {
   display: flex !important;
   align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 40px !important;
+  padding: 8px 14px !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.legend-header:active {
+  background: #f1f5f9 !important;
+}
+
+.legend-header-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+}
+
+.legend-header-icon {
+  font-size: 14px !important;
+  line-height: 1 !important;
+}
+
+.legend-title-text {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+
+.legend-toggle-arrow {
+  font-size: 10px !important;
+  color: #64748b !important;
+  transition: transform 0.25s ease !important;
+  margin-left: 8px !important;
+}
+
+/* VÙNG DANH SÁCH MỤC KHI BUNG RA */
+.legend-content {
+  padding: 10px 14px 14px 14px !important;
+  max-height: 48vh !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important; /* Cuộn quán tính mượt mà trên iOS */
+  display: flex !important;
+  flex-direction: column !important;
   gap: 6px !important;
 }
 
-.custom-map-legend .legend-text {
-  font-size: 10px !important;
+/* Thanh cuộn siêu mảnh tinh tế */
+.legend-content::-webkit-scrollbar {
+  width: 4px !important;
+}
+.legend-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 4px !important;
+}
+
+/* TIÊU ĐỀ TỪNG CỤM HẠ TẦNG */
+.legend-group-title {
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  color: #94a3b8 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.6px !important;
+  margin-top: 6px !important;
+  margin-bottom: 2px !important;
+  border-bottom: 1px dashed #e2e8f0 !important;
+  padding-bottom: 2px !important;
+}
+
+.legend-group-title:first-child {
+  margin-top: 0 !important;
+}
+
+/* DÒNG HIỂN THỊ TỪNG ĐỐI TƯỢNG */
+.legend-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 11px !important;
   font-weight: 600 !important;
   color: #334155 !important;
+  line-height: 1.3 !important;
 }
 
-.custom-map-legend .rainwater-point {
-  width: 10px !important; height: 10px !important; border-radius: 50% !important;
-  background-color: #007bff !important; border: 2px solid #ffffff !important;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;
+.legend-text {
+  white-space: nowrap !important;
 }
 
-.custom-map-legend .wastewater-point {
-  width: 10px !important; height: 10px !important; border-radius: 50% !important;
-  background-color: #800080 !important; border: 2px solid #ffffff !important;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3) !important; display: inline-block !important;
+/* ĐỊNH DẠNG HÌNH HỌC MÔ PHỎNG */
+.legend-line {
+  display: inline-block !important;
+  width: 16px !important;
+  height: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.legend-box {
+  display: inline-block !important;
+  width: 12px !important;
+  height: 10px !important;
+  border-radius: 2px !important;
+  flex-shrink: 0 !important;
+}
+
+.legend-point {
+  border-radius: 50% !important;
+  border: 1.5px solid #ffffff !important;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.35) !important;
+  flex-shrink: 0 !important;
+}
+
+.legend-icon-mini {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 14px !important;
+  font-size: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* MÀU SẮC CHUẨN ĐỒNG BỘ VỚI CÁC LAYER POSTGIS */
+.boundary-line { border-top: 2.5px dashed #e11d48 !important; }
+.plot-box { background-color: #b45309 !important; opacity: 0.7 !important; border: 1px solid #f55b02 !important; }
+.factory-box { background-color: #dc3545 !important; opacity: 0.75 !important; border: 1px solid #b91c1c !important; }
+.road-line { border-top: 4px solid #FFE082 !important; }
+.greenery-box { background-color: #22c55e !important; opacity: 0.75 !important; border: 1px solid #15803d !important; }
+.water-box { background-color: #0284c7 !important; opacity: 0.75 !important; border: 1px solid #0369a1 !important; }
+
+.rainwater-point { width: 9px !important; height: 9px !important; background-color: #007bff !important; }
+.rain-pipe-line { border-top: 2.5px solid #0284c7 !important; }
+.wastewater-point { width: 9px !important; height: 9px !important; background-color: #800080 !important; }
+.waste-pipe-line { border-top: 2.5px solid #9333ea !important; }
+
+.pole-point { width: 8px !important; height: 8px !important; background-color: #eab308 !important; }
+.cable-line { border-top: 2.5px solid #f59e0b !important; }
+
+/* =============================================================================
+ * TINH CHỈNH ĐẶC BIỆT CHO MÀN HÌNH ĐIỆN THOẠI DI ĐỘNG (< 768px)
+ * ============================================================================= */
+@media (max-width: 768px) {
+  .leaflet-bottom.leaflet-left {
+    margin-left: 8px !important;
+    /* Tránh va chạm thanh thao tác đáy hoặc che quá sâu góc trái */
+    margin-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Khi thu gọn trên di động: làm thành viên nhộng bo tròn nhỏ gọn */
+  .custom-map-legend.collapsed {
+    border-radius: 20px !important;
+  }
+
+  .custom-map-legend.collapsed .legend-header {
+    padding: 2px 5px !important;
+    min-height: 34px !important;
+  }
+
+  .custom-map-legend.collapsed .legend-title-text {
+    font-size: 10px !important;
+  }
+
+  /* Khi bung ra trên mobile: giới hạn chiều cao tối đa 38vh để chừa không gian xem map */
+  .custom-map-legend:not(.collapsed) {
+    width: 215px !important;
+    max-height: 40vh !important;
+  }
+
+  .legend-content {
+    max-height: 32vh !important;
+    padding: 8px 11px 12px 11px !important;
+    gap: 5px !important;
+  }
+
+  .legend-item {
+    font-size: 10.5px !important;
+    gap: 7px !important;
+  }
 }
 
 /* BASEMAP CONTROL STYLING */
@@ -1547,5 +2554,58 @@ export default {
   user-select: none;
   line-height: 1.2;
   /* ⚠️ TUYỆT ĐỐI KHÔNG để transform, position: absolute, margin âm ở đây */
+}
+
+/* Giải phóng vùng đệm pane đường cống để click xuyên qua khoảng trống */
+.leaflet-pipesPane-pane {
+  pointer-events: none !important;
+}
+
+/* Bắt sự kiện click chính xác trên nét vẽ cống */
+.leaflet-pipesPane-pane svg path {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Nhãn hiển thị tên thửa đất doanh nghiệp */
+:deep(.company-land-label) {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  padding: 3px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2) !important;
+  pointer-events: none !important;
+  white-space: nowrap !important;
+}
+:deep(.company-land-label::before) { display: none !important; }
+
+/* 1. Giải phóng toàn bộ khung Pane của Đất doanh nghiệp để không che các lớp dưới */
+.leaflet-pane.leaflet-companyLandsPane-pane {
+  pointer-events: none !important;
+}
+
+/* 2. Bắt buộc kích hoạt sự kiện chuột LÊN ĐÚNG CÁC ĐA GIÁC (PATH) */
+.leaflet-pane.leaflet-companyLandsPane-pane svg path {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* 3. Cho phép click xuyên qua nhãn chữ của thửa đất */
+.company-land-label {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* 4. Đảm bảo Pane mặt đường (roadsPane) không nuốt click */
+.leaflet-pane.leaflet-roadsPane-pane {
+  pointer-events: none !important;
+}
+.leaflet-pane.leaflet-roadsPane-pane svg path {
+  pointer-events: auto !important;
 }
 </style>

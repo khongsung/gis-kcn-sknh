@@ -12,12 +12,29 @@ class Plot extends Model
 {
     use HasFactory, LogsActivity; // 🌟 Tự động kích hoạt Audit Log khi Thêm/Sửa/Xóa
 
+    protected $table = 'plots';
+
+    // protected $fillable = [
+    //     'code',
+    //     'land_type',
+    //     'color',
+    //     'total_area',
+    //     'description',
+    //     'zone_id',
+    //     'geom',
+    // ];
+
     protected $fillable = [
         'code',
-        'total_area',
+        'land_type',
+        'color',
         'description',
         'zone_id',
         'geom',
+    ];
+
+    protected $casts = [
+        'total_area' => 'float',
     ];
 
     /**
@@ -47,5 +64,15 @@ class Plot extends Model
             'id',         // Khóa chính trên bảng plots
             'company_id'  // Khóa ngoại trên bảng factories trỏ về companies
         )->distinct();
+    }
+
+    // Tự động gán màu tương ứng nếu khi lưu chưa chỉ định color cụ thể
+    protected static function booted()
+    {
+        static::saving(function ($plot) {
+            if (empty($plot->color)) {
+                $plot->color = ($plot->land_type === 'commercial') ? '#e11d48' : '#b45309';
+            }
+        });
     }
 }

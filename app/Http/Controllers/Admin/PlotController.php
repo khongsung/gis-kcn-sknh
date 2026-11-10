@@ -70,27 +70,53 @@ class PlotController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'code'        => 'required|string|max:50|unique:plots,code',
-            'area'        => 'required|numeric|min:0',
-            'description' => 'nullable|string',
-            'geojson'     => 'nullable|string', 
-            'company_ids' => 'nullable|array',
+            'code'          => 'required|string|max:50|unique:plots,code',
+            'land_type'     => 'required|in:industrial,commercial',
+            'color'         => ['required', 'string', 'regex:/^#([a-fA-F0-9]{6}|[a-fA-F0-9]{3})$/'],
+            'area'          => 'nullable|numeric|min:0',
+            'description'   => 'nullable|string',
+            'geojson'       => 'nullable|string', 
+            'company_ids'   => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
         ]);
 
-        $geomJson = $request->geojson;
+        $geomJson = !empty($validated['geojson']) ? $validated['geojson'] : null;
+        $inputArea = (isset($validated['area']) && $validated['area'] !== '' && $validated['area'] > 0) 
+            ? $validated['area'] 
+            : null;
 
-        // 🌟 Tạo Lô đất bằng Eloquent Model (Kích hoạt Audit Log Event CREATED)
+        // 🌟 1. Tạo record Lô đất
         $plot = Plot::create([
             'code'        => $validated['code'],
-            'total_area'  => $validated['area'],
+            'land_type'   => $validated['land_type'],
+            'color'       => $validated['color'],
+            'total_area'  => $inputArea,
             'description' => $validated['description'] ?? null,
-            'geom'        => $geomJson ? DB::raw("ST_GeomFromGeoJSON('$geomJson')") : null,
+            'geom'        => null,
         ]);
 
-        // 🌟 Đồng bộ mối quan hệ N-N với Công ty qua Eloquent sync()
+        // 🌟 2. Đồng bộ công ty thuê
         if ($request->status === 'rented' && !empty($request->company_ids)) {
             $plot->companies()->sync($request->company_ids);
+        }
+
+        // 🌟 3. Cập nhật hình học PostGIS và TỰ ĐỘNG TÍNH DIỆN TÍCH nếu ô area để trống
+        if ($geomJson) {
+            if (empty($inputArea)) {
+                // Tự động tính diện tích thực tế m² bằng ST_Area(geom::geography)
+                DB::statement("
+                    UPDATE plots 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326),
+                        total_area = ROUND(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)::geography)::numeric, 2)
+                    WHERE id = ?
+                ", [$geomJson, $geomJson, $plot->id]);
+            } else {
+                DB::statement("
+                    UPDATE plots 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)
+                    WHERE id = ?
+                ", [$geomJson, $plot->id]);
+            }
         }
 
         return redirect()->back()->with('success', 'Thêm lô đất mới thành công!');
@@ -102,23 +128,47 @@ class PlotController extends Controller
         $plot = Plot::findOrFail($id);
 
         $validated = $request->validate([
-            'code'        => 'required|string|max:50|unique:plots,code,' . $plot->id,
-            'area'        => 'required|numeric|min:0',
-            'description' => 'nullable|string',
-            'geojson'     => 'nullable|string',
-            'company_ids' => 'nullable|array',
+            'code'          => 'required|string|max:50|unique:plots,code,' . $plot->id,
+            'land_type'     => 'required|in:industrial,commercial',
+            'color'         => ['required', 'string', 'regex:/^#([a-fA-F0-9]{6}|[a-fA-F0-9]{3})$/'],
+            'area'          => 'nullable|numeric|min:0',
+            'description'   => 'nullable|string',
+            'geojson'       => 'nullable|string',
+            'company_ids'   => 'nullable|array',
             'company_ids.*' => 'exists:companies,id',
         ]);
 
-        $geomJson = $request->geojson;
+        $geomJson = !empty($validated['geojson']) ? $validated['geojson'] : null;
+        $inputArea = (isset($validated['area']) && $validated['area'] !== '' && $validated['area'] > 0) 
+            ? $validated['area'] 
+            : null;
 
-        // 🌟 Cập nhật Lô đất bằng Eloquent Model (Kích hoạt Audit Log Event UPDATED)
+        // 🌟 1. Cập nhật các trường thông tin cơ bản
         $plot->update([
             'code'        => $validated['code'],
-            'total_area'  => $validated['area'],
+            'land_type'   => $validated['land_type'],
+            'color'       => $validated['color'],
+            'total_area'  => $inputArea,
             'description' => $validated['description'] ?? null,
-            'geom'        => $geomJson ? DB::raw("ST_GeomFromGeoJSON('$geomJson')") : null,
         ]);
+
+        // 🌟 2. Cập nhật hình học PostGIS và TỰ ĐỘNG TÍNH LẠI DIỆN TÍCH nếu ô area để trống
+        if ($geomJson) {
+            if (empty($inputArea)) {
+                DB::statement("
+                    UPDATE plots 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326),
+                        total_area = ROUND(ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)::geography)::numeric, 2)
+                    WHERE id = ?
+                ", [$geomJson, $geomJson, $plot->id]);
+            } else {
+                DB::statement("
+                    UPDATE plots 
+                    SET geom = ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)
+                    WHERE id = ?
+                ", [$geomJson, $plot->id]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Cập nhật lô đất thành công!');
     }

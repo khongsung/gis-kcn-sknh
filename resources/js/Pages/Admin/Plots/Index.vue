@@ -43,6 +43,7 @@
               <tr>
                 <th>STT</th>
                 <th>Mã Lô Đất</th>
+                <th>Loại Đất</th>
                 <th>Diện Tích (m²)</th>
                 <th style="min-width: 200px;">Giới Thiệu / Trích Ngang</th>
                 <th>Tọa Độ GIS</th>
@@ -54,6 +55,23 @@
               <tr v-for="(p, index) in filteredPlots" :key="p.id">
                 <td>{{ index + 1 }}</td>
                 <td><b class="plot-code">🗺️ {{ p.code }}</b></td>
+                <!-- 🌟 CỘT HIỂN THỊ LOẠI ĐẤT & MÀU SẮC -->
+                <td>
+                  <span 
+                    class="badge-land-type" 
+                    :style="{ 
+                      backgroundColor: p.color ? p.color + '15' : '#b4530915', 
+                      borderColor: p.color || '#b45309',
+                      color: p.color || '#b45309'
+                    }"
+                  >
+                    <span 
+                      class="color-dot" 
+                      :style="{ backgroundColor: p.color || '#b45309' }"
+                    ></span>
+                    {{ p.land_type === 'commercial' ? 'Đất Thương mại dịch vụ' : 'Đất Công nghiệp' }}
+                  </span>
+                </td>
                 <td>
                   <span class="area-text">
                     {{ formatNumber(p.total_area || p.area) }} m²
@@ -114,18 +132,58 @@
               </div>
 
               <div class="form-group half">
-                <label>Diện tích (m²) <span class="required">*</span></label>
+                <label>Loại đất quy hoạch <span class="required">*</span></label>
+                <select v-model="form.land_type" @change="onLandTypeChange" required>
+                  <option value="industrial">🏭 Đất Công nghiệp (CN)</option>
+                  <option value="commercial">🏬 Đất Thương mại dịch vụ (TMDV)</option>
+                </select>
+                <small v-if="form.errors.land_type" class="error-text">{{ form.errors.land_type }}</small>
+              </div>
+            </div>
+
+            <!-- 2. BẢNG MÀU COLOR PICKER -->
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Diện tích (m²)</label>
                 <input 
                   type="number" 
                   step="0.1" 
-                  v-model="form.area" 
-                  required 
+                  v-model="form.area"  
                   placeholder="10000" 
                   :class="{ 'input-error': form.errors.area }"
                 />
                 <small v-if="form.errors.area" class="error-text">{{ form.errors.area }}</small>
               </div>
+              <div class="form-group half">
+                <label>Màu sắc hiển thị trên WebGIS</label>
+                <div class="color-picker-wrapper">
+                  <input 
+                    type="color" 
+                    v-model="form.color" 
+                    class="color-input"
+                    title="Chọn màu sắc"
+                  />
+                  <input 
+                    type="text" 
+                    v-model="form.color" 
+                    placeholder="#b45309"
+                    class="color-text-input"
+                    maxlength="7"
+                  />
+                  <!-- Nút hoàn nguyên màu mặc định theo loại đất -->
+                  <button 
+                    type="button" 
+                    class="btn-reset-color" 
+                    @click="resetDefaultColor" 
+                    title="Khôi phục màu mặc định"
+                  >
+                    ↺ Mặc định
+                  </button>
+                </div>
+                <small v-if="form.errors.color" class="error-text">{{ form.errors.color }}</small>
+              </div>
             </div>
+            
 
             <!-- 🌟 Ô GIỚI THIỆU / MÔ TẢ ĐÃ CHUYỂN THÀNH TEXTAREA CHIẾM TRỌN CHIỀU RỘNG -->
             <div class="form-group full-width">
@@ -200,6 +258,8 @@ export default {
       coordinates_input: '',
       form: this.$inertia.form({
         code: '',
+        land_type: 'industrial', // 🌟 Mặc định Đất công nghiệp
+        color: '#b45309',
         area: '',
         status: 'available',
         description: '',
@@ -239,12 +299,26 @@ export default {
     },
 
     isFormValid() {
-      const isCodeValid = this.form.code && this.form.code.trim() !== '';
-      const isAreaValid = this.form.area && !isNaN(this.form.area);
-      return isCodeValid && isAreaValid && this.isCoordinatesValid;
+      const isCodeValid = Boolean(this.form.code && this.form.code.trim() !== '');
+      const isLandTypeValid = Boolean(this.form.land_type && this.form.land_type.trim() !== '');
+      return isCodeValid && isLandTypeValid && this.isCoordinatesValid;
     }
   },
   methods: {
+    // 🌟 Tự động đổi màu khi chuyển đổi loại đất
+    onLandTypeChange() {
+      if (this.form.land_type === 'commercial') {
+        this.form.color = '#e11d48'; // Hồng đỏ cho đất TMDV
+      } else {
+        this.form.color = '#b45309'; // Nâu cam cho đất công nghiệp
+      }
+    },
+
+    // 🌟 Khôi phục lại màu chuẩn
+    resetDefaultColor() {
+      this.onLandTypeChange();
+    },
+
     onCoordinatesChange() {
       if (!this.coordinates_input || this.coordinates_input.trim() === '') {
         this.form.geojson = '';
@@ -314,6 +388,8 @@ export default {
       this.selectedPlotId = null;
       this.form.reset();
       this.form.clearErrors();
+      this.form.land_type = 'industrial';
+      this.form.color = '#b45309';
       this.coordinates_input = '';
       this.form.status = 'available';
       this.form.description = '';
@@ -326,6 +402,9 @@ export default {
       this.selectedPlotId = plot.id;
       this.form.clearErrors();
       this.form.code = plot.code || '';
+      // 🌟 Nạp dữ liệu loại đất và màu sắc (có fallback)
+      this.form.land_type = plot.land_type || 'industrial';
+      this.form.color = plot.color || (this.form.land_type === 'commercial' ? '#e11d48' : '#b45309');
       this.form.area = plot.total_area || plot.area || '';
       this.form.status = plot.status || 'available';
       this.form.description = plot.description || '';
@@ -439,4 +518,80 @@ export default {
 .help-text { font-size: 11px; color: #64748b; margin-top: 4px; display: block; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
 .btn-primary:disabled, .btn-disabled { background-color: #94a3b8 !important; cursor: not-allowed !important; opacity: 0.7; }
+
+/* BADGE HIỂN THỊ LOẠI ĐẤT TRÊN BẢNG */
+.badge-land-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* KHỐI COLOR PICKER CHUYÊN NGHIỆP */
+.color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px;
+  background: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.color-text-input {
+  font-family: monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.btn-reset-color {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-color:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
 </style>

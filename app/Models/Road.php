@@ -52,4 +52,9 @@ class Road extends Model
     {
         return $this->hasMany(LightingCable::class, 'road_id');
     }
+
+    public function waterPipes()
+    {
+        return $this->hasMany(\App\Models\WaterPipe::class, 'road_id');
+    }
 }

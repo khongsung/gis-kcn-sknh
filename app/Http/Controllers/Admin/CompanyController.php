@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\IndustrialZone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -30,6 +31,7 @@ class CompanyController extends Controller
                 ]
             ],
             'companies' => $companies,
+            'zones'     => IndustrialZone::select('id', 'name', 'code')->get(),
         ]);
     }
 
@@ -37,48 +39,55 @@ class CompanyController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'tax_code'    => 'nullable|string|max:50|unique:companies,tax_code',
-            'industry'    => 'nullable|string|max:255',
-            'color'       => 'nullable|string|max:20',
-            'phone'       => 'nullable|string|max:50',
-            'email'       => 'nullable|email|max:255',
-            'description' => 'nullable|string',
-        ], [
-            'name.required'     => 'Vui lòng nhập Tên công ty',
-            'tax_code.unique'   => 'Mã số thuế này đã tồn tại trên hệ thống',
-            'email.email'       => 'Email không đúng định dạng',
+            'name'                          => 'required|string|max:255',
+            'tax_code'                      => 'nullable|string|max:50|unique:companies,tax_code',
+            'total_leased_area'             => 'nullable|numeric|min:0',
+            'investment_certificate_number' => 'nullable|string|max:100',
+            'investment_certificate_date'   => 'nullable|date',
+            'lease_start_date'              => 'nullable|date',
+            'lease_end_date'                => 'nullable|date|after_or_equal:lease_start_date',
+            'industry'                      => 'nullable|string|max:255',
+            'main_industry'                 => 'nullable|string|max:150',
+            'country'                       => 'nullable|string|max:100',
+            'color'                         => ['required', 'string', 'regex:/^#([a-fA-F0-9]{6}|[a-fA-F0-9]{3})$/'],
+            'phone'                         => 'nullable|string|max:50',
+            'email'                         => 'nullable|email|max:100',
+            'description'                   => 'nullable|string',
+            'notes'                         => 'nullable|string',
+            'zone_id'                       => 'nullable|exists:industrial_zones,id',
         ]);
 
-        // 🌟 Tạo mới bằng Eloquent (Tự động kích hoạt Log event CREATED)
         Company::create($validated);
 
-        return redirect()->back()->with('success', 'Thêm công ty thành công!');
+        return redirect()->back()->with('success', 'Thêm công ty mới thành công!');
     }
 
-    // 3. Cập nhật thông tin Công ty
     public function update(Request $request, $id)
     {
         $company = Company::findOrFail($id);
 
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'tax_code'    => 'nullable|string|max:50|unique:companies,tax_code,' . $company->id,
-            'industry'    => 'nullable|string|max:255',
-            'color'       => 'nullable|string|max:20',
-            'phone'       => 'nullable|string|max:50',
-            'email'       => 'nullable|email|max:255',
-            'description' => 'nullable|string',
-        ], [
-            'name.required'     => 'Vui lòng nhập Tên công ty',
-            'tax_code.unique'   => 'Mã số thuế này đã tồn tại trên hệ thống',
-            'email.email'       => 'Email không đúng định dạng',
+            'name'                          => 'required|string|max:255',
+            'tax_code'                      => 'nullable|string|max:50|unique:companies,tax_code,' . $company->id,
+            'total_leased_area'             => 'nullable|numeric|min:0',
+            'investment_certificate_number' => 'nullable|string|max:100',
+            'investment_certificate_date'   => 'nullable|date',
+            'lease_start_date'              => 'nullable|date',
+            'lease_end_date'                => 'nullable|date|after_or_equal:lease_start_date',
+            'industry'                      => 'nullable|string|max:255',
+            'main_industry'                 => 'nullable|string|max:150',
+            'country'                       => 'nullable|string|max:100',
+            'color'                         => ['required', 'string', 'regex:/^#([a-fA-F0-9]{6}|[a-fA-F0-9]{3})$/'],
+            'phone'                         => 'nullable|string|max:50',
+            'email'                         => 'nullable|email|max:100',
+            'description'                   => 'nullable|string',
+            'notes'                         => 'nullable|string',
+            'zone_id'                       => 'nullable|exists:industrial_zones,id',
         ]);
 
-        // 🌟 Cập nhật bằng Eloquent (Tự động kích hoạt Log event UPDATED kèm dữ liệu cũ/mới)
         $company->update($validated);
 
-        return redirect()->back()->with('success', 'Cập nhật công ty thành công!');
+        return redirect()->back()->with('success', 'Cập nhật thông tin công ty thành công!');
     }
 
     // 4. Xóa Công ty

@@ -47,14 +47,19 @@
               <span>Quản lý Lô đất</span>
             </a>
 
+            <a href="/admin/company-lands" class="menu-item" :class="{ active: currentPath.startsWith('/admin/company-lands') }">
+              <span class="menu-icon">📜</span>
+              <span>Đất Doanh Nghiệp</span>
+            </a>
+
             <a href="/admin/companies" class="menu-item" :class="{ active: currentPath.startsWith('/admin/companies') }">
               <span class="menu-icon">🏢</span>
-              <span>Quản lý Công ty</span>
+              <span>Thông tin Các Công ty</span>
             </a>
 
             <a href="/admin/factories" class="menu-item" :class="{ active: currentPath.startsWith('/admin/factories') }">
               <span class="menu-icon">🏭</span>
-              <span>Quản lý Nhà xưởng</span>
+              <span>Nhà xưởng</span>
             </a>
 
             <a href="/admin/rainwater-manholes" class="menu-item" :class="{ active: currentPath.startsWith('/admin/rainwater-manholes') }">
@@ -67,6 +72,11 @@
               <span>Hố ga Nước thải</span>
             </a>
 
+            <a href="/admin/water-pipes" class="menu-item" :class="{ active: currentPath.startsWith('/admin/water-pipes') }">
+              <span class="icon">🚰</span>
+              <span>Đường ống thoát nước</span>
+            </a>
+
             <a href="/admin/roads" class="menu-item" :class="{ active: currentPath.startsWith('/admin/roads') }">
               <span class="menu-icon">🛣️</span>
               <span>Đường giao thông</span>
@@ -74,17 +84,17 @@
 
             <a href="/admin/greenery" class="menu-item" :class="{ active: currentPath.startsWith('/admin/greenery') }">
               <span class="icon">🌳</span>
-              <span class="label">Quản lý Cây Xanh</span>
+              <span class="label">Cây Xanh</span>
             </a>
 
             <a href="/admin/water-bodies" class="menu-item" :class="{ active: currentPath.startsWith('/admin/water-bodies') }">
               <span class="icon">🌊</span>
-              <span class="label">Quản lý Mặt Nước</span>
+              <span class="label">Mặt Nước</span>
             </a>
 
             <a href="/admin/boundaries" class="menu-item" :class="{ active: currentPath.startsWith('/admin/boundaries') }">
               <span class="icon">🔲</span>
-              <span class="label">Quản lý Ranh Giới QH</span>
+              <span class="label">Ranh Giới QH</span>
             </a>
 
             <a 
@@ -93,7 +103,7 @@
               :class="{ 'active': $page.url.startsWith('/admin/lighting-cabinets') }"
             >
               <span class="icon">⚡</span>
-              <span>Quản lý Tủ điện chiếu sáng</span>
+              <span>Tủ điện chiếu sáng</span>
             </a>
 
             <a 
@@ -117,7 +127,7 @@
 
             <a href="/admin/industrial-zones" class="menu-item" :class="{ active: currentPath.startsWith('/admin/industrial-zones') }">
               <span class="icon">🏭</span>
-              <span>Khu Công Nghiệp</span>
+              <span>Thông tin Khu Công Nghiệp</span>
             </a>
 
           </template>

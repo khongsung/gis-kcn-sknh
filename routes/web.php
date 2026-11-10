@@ -20,6 +20,8 @@ use App\Http\Controllers\Admin\LightingCableController;
 use App\Http\Controllers\Admin\LightingPoleController;
 use App\Http\Controllers\Admin\SurroundingLocationController;
 use App\Http\Controllers\Admin\IndustrialZoneController;
+use App\Http\Controllers\Admin\WaterPipeController;
+use App\Http\Controllers\Admin\CompanyLandController;
 
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -126,6 +128,14 @@ Route::middleware(['auth', \App\Http\Middleware\CheckAdminRole::class])->prefix(
 
     // Quản lý khu công nghiệp
     Route::resource('industrial-zones', IndustrialZoneController::class)->except(['create', 'show', 'edit']);
+
+    //  Quản lý đường ống nước mưa, nước thải
+    Route::resource('water-pipes', WaterPipeController::class)->only([
+        'index', 'store', 'update', 'destroy'
+    ]);
+
+    // Quản lý đất các công ty đã thuê
+    Route::resource('company-lands', CompanyLandController::class)->except(['create', 'show', 'edit']);
 
 });
 

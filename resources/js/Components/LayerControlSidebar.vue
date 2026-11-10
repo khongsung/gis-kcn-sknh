@@ -140,15 +140,14 @@ export default {
       layerConfig: [
         { key: 'boundaries', label: 'Ranh giới quy hoạch', icon: '🔲', badgeColor: '#e11d48', textColor: '#e11d48' },
         { key: 'plots', label: 'Lô đất KCN', icon: '🏢', badgeColor: '#b45309', textColor: '#b45309' },
+        { key: 'companyLands', label: 'Đất DN đã thuê', icon: '🗺️', badgeColor: '#003099', textColor: '#003099' },
         { key: 'factories', label: 'Nhà xưởng KCN', icon: '🏭', badgeColor: '#166534', textColor: '#166534' },
         { key: 'roads', label: 'Đường giao thông', icon: '🛣️', badgeColor: '#f59e0b', textColor: '#d97706' },
         { key: 'greenery', label: 'Cây xanh & Thảm cỏ', icon: '🌳', badgeColor: '#16a34a', textColor: '#15803d' },
         { key: 'waterBodies', label: 'Mặt nước & Hồ điều hòa', icon: '🌊', badgeColor: '#0284c7', textColor: '#0369a1' },
         
-        // 🌟 3 LỚP HỆ THỐNG ĐIỆN CHIẾU SÁNG MỚI BỔ SUNG 🌟
-        { key: 'lightingCabinets', label: 'Tủ điện điều khiển', icon: '⚡', badgeColor: '#d97706', textColor: '#b45309' },
-        { key: 'lightingCables', label: 'Tuyến cáp chiếu sáng', icon: '〰️', badgeColor: '#f59e0b', textColor: '#d97706' },
-        { key: 'lightingPoles', label: 'Cột đèn chiếu sáng', icon: '💡', badgeColor: '#ca8a04', textColor: '#ca8a04' },
+        // 🌟 LỚP HỆ THỐNG ĐIỆN CHIẾU SÁNG MỚI BỔ SUNG 🌟
+        { key: 'lightingSystem', label: 'Hệ thống chiếu sáng', icon: '💡', badgeColor: '#ca8a04', textColor: '#ca8a04' },
 
         { key: 'wastewater', label: 'Hố ga Nước thải', icon: '🧪', badgeColor: '#800080', textColor: '#800080' },
         { key: 'rainwater', label: 'Hố ga Nước mưa', icon: '🌧️', badgeColor: '#0284c7', textColor: '#0284c7' },
@@ -159,13 +158,12 @@ export default {
       layers: {
         boundaries: { visible: true, opacity: 0.95 },
         plots: { visible: true, opacity: 0.4 },
+        companyLands: { visible: false, opacity: 0.7 },
         factories: { visible: false, opacity: 0.65 },
         roads: { visible: true, opacity: 0.85 },
         greenery: { visible: true, opacity: 0.5, name: "greenery" },    
         waterBodies: { visible: true, opacity: 0.6, name: "waterBodies" },
-        lightingCabinets: { visible: false, opacity: 1.0 },
-        lightingCables: { visible: false, opacity: 0.9 },
-        lightingPoles: { visible: false, opacity: 0.95 },
+        lightingSystem: { visible: false, opacity: 1.0 },
         wastewater: { visible: false, opacity: 0.9 },
         rainwater: { visible: false, opacity: 0.9 },
         surroundingLocations: { visible: true, opacity: 1.0 }

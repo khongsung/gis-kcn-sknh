@@ -22,18 +22,36 @@ class MapController extends Controller
         $factoriesRaw = Factory::query()
             ->leftJoin('companies', 'factories.company_id', '=', 'companies.id')
             ->leftJoin('plots', 'factories.plot_id', '=', 'plots.id')
+            ->leftJoin('industrial_zones', 'companies.zone_id', '=', 'industrial_zones.id')
             ->select(
                 'factories.id',
                 'factories.code',
                 'factories.area',
                 'factories.status',
                 'factories.company_id',
+                
+                // Thông tin pháp lý & nhận diện doanh nghiệp
                 'companies.name as company_name',
                 'companies.tax_code as company_tax_code',
                 'companies.industry as company_industry',
+                'companies.main_industry as company_main_industry',
+                'companies.country as company_country',
                 'companies.color as company_color',
                 'companies.phone as company_phone',
                 'companies.email as company_email',
+                'companies.description as company_description',
+                'companies.notes as company_notes',
+
+                // Pháp lý GCN Đăng ký đầu tư (IRC) & Thời hạn thuê
+                'companies.investment_certificate_number as company_irc_number',
+                'companies.investment_certificate_date as company_irc_date',
+                'companies.total_leased_area as company_total_leased_area',
+                'companies.lease_start_date as company_lease_start_date',
+                'companies.lease_end_date as company_lease_end_date',
+
+                // Khu công nghiệp & Lô đất
+                'companies.zone_id as company_zone_id',
+                'industrial_zones.name as zone_name',
                 'plots.code as plot_code',
                 DB::raw('ST_AsGeoJSON(factories.geom) as geojson')
             )
@@ -46,19 +64,34 @@ class MapController extends Controller
                 'type' => 'Feature',
                 'geometry' => $geometry,
                 'properties' => [
-                    'id'               => $item->id,
-                    'code'             => $item->code,
-                    'area'             => $item->area,
-                    'status'           => $item->status,
-                    'plot_code'        => $item->plot_code,
+                    'id'                        => $item->id,
+                    'code'                      => $item->code,
+                    'area'                      => $item->area,
+                    'status'                    => $item->status,
+                    'plot_code'                 => $item->plot_code,
                     
-                    'company_id'       => $item->company_id,
-                    'company_name'     => $item->company_name ?? 'Đang trống / Chưa thuê',
-                    'company_tax_code' => $item->company_tax_code ?? 'N/A',
-                    'company_industry' => $item->company_industry ?? 'N/A',
-                    'company_color'    => $item->company_color ?? 'N/A',
-                    'company_phone'    => $item->company_phone ?? 'N/A',
-                    'company_email'    => $item->company_email ?? 'N/A',
+                    // Doanh nghiệp thuê
+                    'company_id'                => $item->company_id,
+                    'company_name'              => $item->company_name ?? 'Đang trống / Chưa thuê',
+                    'company_tax_code'          => $item->company_tax_code ?? '—',
+                    'company_country'           => $item->company_country ?? 'Việt Nam',
+                    'company_industry'          => $item->company_industry ?? '—',
+                    'company_main_industry'     => $item->company_main_industry ?? $item->company_industry ?? '—',
+                    'company_color'             => $item->company_color ?? '#2563eb',
+                    'company_phone'             => $item->company_phone ?? '—',
+                    'company_email'             => $item->company_email ?? '—',
+                    'company_description'       => $item->company_description ?? '',
+                    'company_notes'             => $item->company_notes ?? '',
+
+                    // Thông tin đầu tư & thời hạn dự án
+                    'company_irc_number'        => $item->company_irc_number ?? '—',
+                    'company_irc_date'          => $item->company_irc_date ? date('d/m/Y', strtotime($item->company_irc_date)) : '—',
+                    'company_total_leased_area' => $item->company_total_leased_area ? (float) $item->company_total_leased_area : null,
+                    'company_lease_start_date'  => $item->company_lease_start_date ? date('d/m/Y', strtotime($item->company_lease_start_date)) : '—',
+                    'company_lease_end_date'    => $item->company_lease_end_date ? date('d/m/Y', strtotime($item->company_lease_end_date)) : '—',
+
+                    // Khu công nghiệp
+                    'zone_name'                 => $item->zone_name ?? 'KCN Song Khê - Nội Hoàng'
                 ]
             ];
         });
@@ -164,6 +197,8 @@ class MapController extends Controller
                 'id',
                 'code',
                 'total_area',
+                'land_type',
+                'color',
                 'description',
                 DB::raw('ST_AsGeoJSON(geom) as geojson')
             )
@@ -178,6 +213,8 @@ class MapController extends Controller
                     'id'          => $plot->id,
                     'code'        => $plot->code,
                     'total_area'  => $plot->total_area,
+                    'land_type'   => $plot->land_type ?? 'industrial',
+                    'color'       => $plot->color ?: ($plot->land_type === 'commercial' ? '#e11d48' : '#b45309'),
                     'description' => $plot->description,
                 ]
             ];
@@ -353,6 +390,84 @@ class MapController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+
+        // 🌟 TRUY VẤN DỮ LIỆU ĐƯỜNG ỐNG THOÁT NƯỚC (NƯỚC THẢI & NƯỚC MƯA)
+        $drainagePipesData = DB::selectOne("
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(wp.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', wp.id,
+                        'code', wp.code,
+                        'name', wp.name,
+                        'pipe_type', wp.pipe_type,
+                        'cross_section', wp.cross_section,
+                        'diameter', wp.diameter,
+                        'width', wp.width,
+                        'height', wp.height,
+                        'material', wp.material,
+                        'invert_start_elevation', wp.invert_start_elevation,
+                        'invert_end_elevation', wp.invert_end_elevation,
+                        'slope', wp.slope,
+                        'status', wp.status,
+                        'start_manhole_code', COALESCE(wm1.code, rm1.code, '---'),
+                        'end_manhole_code', COALESCE(wm2.code, rm2.code, '---'),
+                        'length_m', ROUND(ST_Length(wp.geom::geography)::numeric, 2)
+                    )
+                ) AS feature
+                FROM water_pipes wp
+                LEFT JOIN wastewater_manholes wm1 ON wp.start_manhole_id = wm1.id AND wp.pipe_type = 'wastewater'
+                LEFT JOIN wastewater_manholes wm2 ON wp.end_manhole_id = wm2.id AND wp.pipe_type = 'wastewater'
+                LEFT JOIN rainwater_manholes rm1 ON wp.start_manhole_id = rm1.id AND wp.pipe_type = 'rainwater'
+                LEFT JOIN rainwater_manholes rm2 ON wp.end_manhole_id = rm2.id AND wp.pipe_type = 'rainwater'
+                WHERE wp.geom IS NOT NULL
+            ) sub
+        ");
+
+        // 🌟 TRUY VẤN DỮ LIỆU ĐẤT DOANH NGHIỆP (Polygon)
+        $companyLandsData = DB::selectOne("
+            SELECT jsonb_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(jsonb_agg(feature), '[]'::jsonb)
+            ) as geojson
+            FROM (
+                SELECT jsonb_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(cl.geom)::jsonb,
+                    'properties', jsonb_build_object(
+                        'id', cl.id,
+                        'land_code', cl.land_code,
+                        'certificate_number', cl.certificate_number,
+                        'cadastral_book_number', cl.cadastral_book_number,
+                        'issue_date', cl.issue_date,
+                        'contract_number', cl.contract_number,
+                        'lease_start_date', cl.lease_start_date,
+                        'lease_end_date', cl.lease_end_date,
+                        'payment_type', cl.payment_type,
+                        'leased_area', cl.leased_area,
+                        'calculated_area', cl.calculated_area,
+                        'land_purpose', cl.land_purpose,
+                        'status', cl.status,
+                        'company_id', c.id,
+                        'company_name', c.name,
+                        'company_tax_code', c.tax_code,
+                        'company_color', COALESCE(c.color, '#0284c7'),
+                        'company_phone', c.phone,
+                        'plot_code', p.code
+                    )
+                ) AS feature 
+                FROM company_lands cl
+                LEFT JOIN companies c ON cl.company_id = c.id
+                LEFT JOIN plots p ON cl.plot_id = p.id
+                WHERE cl.geom IS NOT NULL
+            ) sub
+        ");
+
         $user = Auth::user();
 
         // 7. TRUYỀN DỮ LIỆU SANG INERTIA MAP VIEW
@@ -389,6 +504,8 @@ class MapController extends Controller
             'lightingCablesData'   => json_decode($cablesData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
             'lightingPolesData'    => json_decode($polesData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
             'surroundingLocationsData' => json_decode($surroundingLocationsData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
+            'drainagePipesData' => json_decode($drainagePipesData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
+            'companyLandsData' => json_decode($companyLandsData->geojson ?? '{"type":"FeatureCollection","features":[]}'),
             'zonesList' => $zonesList,
         ]);
     }
