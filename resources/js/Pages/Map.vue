@@ -5,7 +5,7 @@
       :zones="zonesList"
       :current-zone-id="activeZoneId"
       @change-zone="handleZoneChange"
-     />
+    />
 
     <!-- 2. KHUNG NỘI DUNG CHÍNH (SIDEBAR + MAP) -->
     <div class="webgis-content">
@@ -38,7 +38,6 @@
 
           <!-- KHỐI NÚT THAO TÁC GÓC PHẢI -->
           <div class="header-actions">
-            <!-- ICON CHỈ ĐƯỜNG NHỎ GỌN -->
             <a 
               v-if="selectedFactory.lat && selectedFactory.lng"
               :href="getGoogleMapsUrl(selectedFactory.lat, selectedFactory.lng)" 
@@ -132,25 +131,41 @@ import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import NavigationBar from '@/Components/NavigationBar.vue';
 import LayerControlSidebar from '@/Components/LayerControlSidebar.vue';
-import centerOfMass from '@turf/center-of-mass';
 import pointOnFeature from '@turf/point-on-feature';
+// [UNUSED] import centerOfMass from '@turf/center-of-mass'; // Đã thay thế bằng pointOnFeature để luôn đảm bảo nhãn nằm trong đa giác
 
-// Bảng tham chiếu lưu trữ các layer GeoJSON
+// Bảng tham chiếu các layer GeoJSON toàn cục của Leaflet
 const leafletLayers = {
   boundaries: null,
   factories: null,
   wastewater: null,
   rainwater: null,
   plots: null,
-  companyLands: null, // 🌟 Khai báo layer Đất doanh nghiệp
+  companyLands: null,
   roads: null,
   greenery: null,
   waterBodies: null,
-  lightingSystem: null, // 🌟 Gom chung: Tủ điện + Cáp + Cột đèn
+  lightingSystem: null,
   surroundingLocations: null
 };
 
+// Cấu hình các Pane và thứ tự zIndex hiển thị chuẩn GIS
+const PANE_CONFIGS = [
+  { name: 'boundariesPane',     zIndex: 390 },
+  { name: 'naturePane',         zIndex: 410 },
+  { name: 'plotsPane',          zIndex: 420 },
+  { name: 'companyLandsPane',   zIndex: 425 },
+  { name: 'roadsPane',          zIndex: 430 },
+  { name: 'pipesPane',          zIndex: 432 },
+  { name: 'lightingCablesPane', zIndex: 435 },
+  { name: 'factoriesPane',      zIndex: 440 },
+  { name: 'pointsPane',         zIndex: 450 },
+  { name: 'lightingPointsPane', zIndex: 460 },
+  { name: 'surroundingPane',    zIndex: 550 }
+];
+
 export default {
+  name: 'MapComponent',
   components: {
     NavigationBar,
     LayerControlSidebar
@@ -161,7 +176,7 @@ export default {
     rainwaterManholesData: Object,
     roadsData: Object,
     plotsData: Object,
-    companyLandsData: Object, // 🌟 Nhận GeoJSON từ MapController
+    companyLandsData: Object,
     greeneryData: Object,  
     waterBodiesData: Object,
     boundariesData: Object,
@@ -169,16 +184,20 @@ export default {
     lightingCablesData: Object,
     lightingPolesData: Object,
     surroundingLocationsData: Object,
-    drainagePipesData: Object, // 🌟 Nhận dữ liệu đường cống từ controller
-    zonesList: { type: Array, default: () => [] },
+    drainagePipesData: Object,
+    zonesList: { type: Array, default: () => [] }
   },
   data() {
     return {
       map: null,
       selectedFactory: null,
+      activeZoneId: '1',
+      // [UNUSED] selectedZoneId: '1', // Trùng lặp với activeZoneId truyền vào NavigationBar
+
+      // Tham chiếu các layer quản lý nhãn / tooltip
       roadsGeoJsonLayer: null,
       plotsGeoJsonLayer: null,
-      companyLandsJsonLayer: null,
+      companyLandsGeoJsonLayer: null,
       factoriesGeoJsonLayer: null,
       greeneryGeoJsonLayer: null,
       waterGeoJsonLayer: null,
@@ -186,54 +205,60 @@ export default {
 
       greeneryLabelMarkers: [],
       waterLabelMarkers: [],
+      zoomDebounceTimer: null,
 
-      // 🌟 Lưu trạng thái bật/tắt do người dùng chọn trên Sidebar
+      // Trạng thái bật/tắt layer do người dùng điều khiển ở Sidebar
       userLayerVisibility: {
         lightingSystem: false,
         wastewater: false,
         rainwater: false,
         companyLands: false,
         surroundingLocations: true
-      },
-
-      selectedZoneId: '1',
+      }
     };
   },
   mounted() {
     this.initMap();
-    // Nếu có danh sách KCN, chọn sẵn KCN đầu tiên
     if (this.zonesList && this.zonesList.length > 0) {
-      this.selectedZoneId = this.zonesList[0].id;
+      this.activeZoneId = this.zonesList[0].id;
+    }
+  },
+  beforeUnmount() {
+    // Thu hồi tài nguyên và timer khi unmount component
+    if (this.zoomDebounceTimer) {
+      clearTimeout(this.zoomDebounceTimer);
+    }
+    if (this.map) {
+      this.map.remove();
+      this.map = null;
     }
   },
   methods: {
+    // =========================================================================
+    // 1. KHỞI TẠO BẢN ĐỒ & PANE QUẢN LÝ TẦNG LỚP
+    // =========================================================================
     initMap() {
-      // 1. Xác định KCN mặc định đầu tiên
       const initialZone = this.zonesList && this.zonesList.length > 0 ? this.zonesList[0] : null;
 
-      // 2. Lấy tọa độ động từ database (nếu không có thì mới lấy tọa độ fallback)
+      // Toạ độ mặc định (KCN Song Khê - Nội Hoàng, Bắc Giang)
       const centerLat = initialZone?.lat ? parseFloat(initialZone.lat) : 21.246624;
       const centerLng = initialZone?.lng ? parseFloat(initialZone.lng) : 106.178020;
 
-      const isMobile = window.innerWidth <= 768; // Kiểm tra nếu là điện thoại/màn hình nhỏ
-      const baseZoom = initialZone?.default_zoom ? parseInt(initialZone.default_zoom) : 15;
-      const targetZoom = isMobile ? Math.max(baseZoom - 1, 13) : baseZoom;
-  
-      // Màn hình điện thoại zoom nhỏ xuống 15 (hoặc 14.5), máy tính giữ nguyên 16
-      const initialZoom = isMobile ? 15 : 16; 
-      
-      // Tọa độ tâm bản đồ KCN Song Khê - Nội Hoàng
-      const initialCenter = [centerLat, centerLng];
+      const isMobile = window.innerWidth <= 768;
+      const baseZoom = initialZone?.default_zoom ? parseInt(initialZone.default_zoom) : 16;
+      const initialZoom = isMobile ? Math.max(baseZoom - 1, 14) : baseZoom;
+
       this.map = L.map('map', {
         zoomControl: false,
         preferCanvas: true,
         wheelDebounceTime: 40,
         wheelPxPerZoomLevel: 80,
         markerZoomAnimation: false
-      }).setView(initialCenter, initialZoom);
+      }).setView([centerLat, centerLng], initialZoom);
 
       L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
+      // Thêm BaseMap vệ tinh Google
       const tileOptions = {
         maxZoom: 20,
         maxNativeZoom: 19,
@@ -243,90 +268,34 @@ export default {
         keepBuffer: 3
       };
 
-      // const googleSatellite = L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-      //   ...tileOptions,
-      //   attribution: 'Google Satellite'
-      // });
-
       const googleSatelliteOnly = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
         ...tileOptions,
         attribution: 'Google Satellite Clean'
       });
-
-      // const googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-      //   ...tileOptions,
-      //   attribution: 'Google Streets'
-      // });
-
       googleSatelliteOnly.addTo(this.map);
-      // googleStreets.addTo(this.map);
 
-      const baseMaps = {
-        // "🛰️ Ảnh vệ tinh": googleSatellite,
-        "🛰️ Vệ tinh (Không nhãn)": googleSatelliteOnly,
-        // "🗺️ Bản đồ Đường phố": googleStreets
-      };
-
-      L.control.layers(baseMaps, null, {
+      L.control.layers({ "🛰️ Vệ tinh (Không nhãn)": googleSatelliteOnly }, null, {
         position: 'topright',
         collapsed: true
       }).addTo(this.map);
 
       this.addMapLegend();
-
       this.map.on('zoomend', this.handleMapZoomEnd);
 
-      // 2. 🌟 TẠO TẤT CẢ CÁC PANE NGAY TẠI ĐÂY (TRƯỚC KHI VẼ BẤT KỲ LAYER NÀO)
-      this.map.createPane('boundariesPane');
-      this.map.getPane('boundariesPane').style.zIndex = 390;
-      this.map.getPane('boundariesPane').style.pointerEvents = 'none';
+      // Khởi tạo các Pane hiển thị theo cấu hình PANE_CONFIGS
+      PANE_CONFIGS.forEach(pane => {
+        this.map.createPane(pane.name);
+        const paneEl = this.map.getPane(pane.name);
+        paneEl.style.zIndex = pane.zIndex;
+        paneEl.style.pointerEvents = 'none'; // Giải phóng click xuyên qua các khoảng trống
+      });
 
-      this.map.createPane('naturePane');
-      this.map.getPane('naturePane').style.zIndex = 410;
-      this.map.getPane('naturePane').style.pointerEvents = 'none';
-
-      this.map.createPane('plotsPane');
-      this.map.getPane('plotsPane').style.zIndex = 420;
-      this.map.getPane('plotsPane').style.pointerEvents = 'none';
-
-      this.map.createPane('companyLandsPane');
-      this.map.getPane('companyLandsPane').style.zIndex = 425;
-      this.map.getPane('companyLandsPane').style.pointerEvents = 'none';
-
-      this.map.createPane('roadsPane');
-      this.map.getPane('roadsPane').style.zIndex = 430;
-      this.map.getPane('roadsPane').style.pointerEvents = 'none';
-
-      // 🌟 TẠO PANE CHO ĐƯỜNG CỐNG (NẰM DƯỚI HỐ GA 450, TRÊN MẶT ĐƯỜNG 430)
-      this.map.createPane('pipesPane');
-      this.map.getPane('pipesPane').style.zIndex = 432;
-      this.map.getPane('pipesPane').style.pointerEvents = 'none';
-
-      this.map.createPane('factoriesPane');
-      this.map.getPane('factoriesPane').style.zIndex = 440;
-      this.map.getPane('factoriesPane').style.pointerEvents = 'none';
-
-      this.map.createPane('pointsPane');
-      this.map.getPane('pointsPane').style.zIndex = 450;
-      this.map.getPane('pointsPane').style.pointerEvents = 'none';
-
-      this.map.createPane('lightingCablesPane');
-      this.map.getPane('lightingCablesPane').style.zIndex = 435;
-      this.map.getPane('lightingCablesPane').style.pointerEvents = 'none';
-
-      this.map.createPane('lightingPointsPane');
-      this.map.getPane('lightingPointsPane').style.zIndex = 460;
-      this.map.getPane('lightingPointsPane').style.pointerEvents = 'none';
-
-      this.map.createPane('surroundingPane');
-      this.map.getPane('surroundingPane').style.zIndex = 550;
-      this.map.getPane('surroundingPane').style.pointerEvents = 'none';
-
+      // Vẽ toàn bộ các lớp dữ liệu
       this.drawBoundaries();
       this.drawPlots();
       this.drawCompanyLands();
-      this.drawGreenery();
-      this.drawWaterBodies();
+      this.drawLandscape('greenery');
+      this.drawLandscape('waterBodies');
       this.drawRoads();
       this.drawFactories();
       this.drawWastewater();
@@ -344,66 +313,186 @@ export default {
       if (leafletLayers.rainwater) leafletLayers.rainwater.bringToFront();
     },
 
-    // 🌟 TỔNG ĐIỀU PHỐI KHI PHÓNG TO / THU NHỎ BẢN ĐỒ
+    // =========================================================================
+    // 2. TÍNH TOÁN KÍCH THƯỚC ĐỘ PHÂN GIẢI MẶT ĐẤT (METERS -> PIXELS)
+    // =========================================================================
+    /**
+     * Quy đổi kích thước thực tế (mét) sang kích thước hiển thị trên màn hình (pixels)
+     */
+    convertMetersToPixels(meters, minPx = 2, maxPx = 20) {
+      if (!this.map || !meters) return minPx;
+      const zoom = this.map.getZoom();
+      const lat = this.map.getCenter().lat;
+      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+      const calcPx = meters / metersPerPixel;
+      return Math.min(maxPx, Math.max(minPx, calcPx));
+    },
+
+    getWeightInPixels(widthInMeters) {
+      return this.convertMetersToPixels(widthInMeters, 3, 40);
+    },
+
+    getPointRadiusInPixels(radiusInMeters, minPx = 2, maxPx = 6) {
+      return this.convertMetersToPixels(radiusInMeters, minPx, maxPx);
+    },
+
+    getCabinetSizeInPixels(sizeInMeters = 1.8, minPx = 12, maxPx = 24) {
+      return Math.round(this.convertMetersToPixels(sizeInMeters, minPx, maxPx));
+    },
+
+    getPipeWeightInPixels(feature) {
+      if (!this.map) return 2.5;
+      const p = feature.properties || {};
+      let sizeInMeters = 0.35; // Mặc định D350
+
+      if (p.cross_section === 'box' && p.width) {
+        sizeInMeters = p.width / 1000;
+      } else if (p.diameter) {
+        sizeInMeters = p.diameter / 1000;
+      }
+      return this.convertMetersToPixels(sizeInMeters, 2.5, 14);
+    },
+
+    // =========================================================================
+    // 3. XỬ LÝ SỰ KIỆN CO GIÃN THEO MỨC ZOOM
+    // =========================================================================
     handleMapZoomEnd() {
       clearTimeout(this.zoomDebounceTimer);
       this.zoomDebounceTimer = setTimeout(() => {
-        this.updateRoadsWidth();           // 1. Co giãn bề rộng đường
-        this.updateInfrastructureSizes();   // 2. Co giãn kích thước hố ga, cột đèn, cáp, tủ
-        this.checkDetailLayersVisibility(); // 3. Tự ẩn khi zoom < 16, hiện khi zoom >= 16
-        this.checkAllLabelsVisibility();    // 4. Bật/tắt nhãn chữ (lô đất, tên đường)
+        this.updateRoadsWidth();
+        this.updateInfrastructureSizes();
+        this.checkDetailLayersVisibility();
+        this.checkAllLabelsVisibility();
 
-        // 🌟 KHÓA CHẶT TỌA ĐỘ TOOLTIP SURROUNDING NGAY KHI DỪNG ZOOM
         if (leafletLayers.surroundingLocations && this.map.hasLayer(leafletLayers.surroundingLocations)) {
           leafletLayers.surroundingLocations.eachLayer((layer) => {
             const tooltip = layer.getTooltip();
-            if (tooltip && tooltip._container) {
-              // Buộc Leaflet cập nhật lại tọa độ offset theo kích thước thực tế
-              tooltip.update();
-            }
+            if (tooltip && tooltip._container) tooltip.update();
           });
         }
       }, 50);
-
-      console.log(this.map.getZoom());
     },
 
-    /**
-     * 🌟 BẮT SỰ KIỆN KHI NGƯỜI DÙNG ĐỔI KCN TRÊN NAVIGATIONBAR
-     */
+    updateRoadsWidth() {
+      if (!this.roadsGeoJsonLayer) return;
+      this.roadsGeoJsonLayer.eachLayer((layer) => {
+        if (layer.feature && layer.setStyle) {
+          const widthInMeters = layer.feature.properties.road_width || layer.feature.properties.right_of_way || 10;
+          layer.setStyle({ weight: this.getWeightInPixels(widthInMeters) });
+        }
+      });
+      this.updateInfrastructureSizes();
+    },
+
+    updateInfrastructureSizes() {
+      if (!this.map) return;
+
+      const wastewaterR = this.getPointRadiusInPixels(3.0, 3.5, 9.0);
+      const rainwaterR  = this.getPointRadiusInPixels(2.6, 3.0, 8.5);
+      const poleR       = this.getPointRadiusInPixels(2.4, 3.0, 8.0);
+      const cableWeight = this.getWeightInPixels(0.3);
+      const cabSize     = this.getCabinetSizeInPixels(2.8, 12, 22);
+
+      // Co giãn hệ thống Nước thải
+      if (leafletLayers.wastewater) {
+        leafletLayers.wastewater.eachLayer((subGroup) => {
+          if (subGroup.eachLayer) {
+            subGroup.eachLayer((layer) => {
+              if (layer.setRadius) layer.setRadius(wastewaterR);
+              if (layer.setStyle && layer.feature?.geometry?.type?.includes('Line')) {
+                layer.setStyle({ weight: Math.max(3, this.getPipeWeightInPixels(layer.feature) + 1.5) });
+              }
+            });
+          }
+        });
+      }
+
+      // Co giãn hệ thống Nước mưa
+      if (leafletLayers.rainwater) {
+        leafletLayers.rainwater.eachLayer((subGroup) => {
+          if (subGroup.eachLayer) {
+            subGroup.eachLayer((layer) => {
+              if (layer.setRadius) layer.setRadius(rainwaterR);
+              if (layer.setStyle && layer.feature?.geometry?.type?.includes('Line')) {
+                layer.setStyle({ weight: Math.max(3.5, this.getPipeWeightInPixels(layer.feature) + 2) });
+              }
+            });
+          }
+        });
+      }
+
+      // Co giãn hệ thống Chiếu sáng
+      if (leafletLayers.lightingSystem) {
+        leafletLayers.lightingSystem.eachLayer((subGroup) => {
+          if (subGroup.eachLayer) {
+            subGroup.eachLayer((l) => {
+              if (l.setRadius) l.setRadius(poleR);
+              if (l.setStyle && l.feature?.geometry?.type?.includes('Line')) {
+                l.setStyle({ weight: Math.max(1, Math.min(2, cableWeight)) });
+              }
+              if (l.setIcon && l.feature?.geometry?.type === 'Point') {
+                l.setIcon(L.divIcon({
+                  className: 'custom-cabinet-marker',
+                  html: `<div class="cabinet-icon-box" style="width: ${cabSize}px; height: ${cabSize}px; font-size: ${Math.round(cabSize * 0.55)}px;" title="${l.feature?.properties?.code || ''}">⚡</div>`,
+                  iconSize: [cabSize, cabSize],
+                  iconAnchor: [Math.round(cabSize / 2), Math.round(cabSize / 2)]
+                }));
+              }
+            });
+          }
+        });
+      }
+    },
+
     handleZoneChange(zone) {
       if (!this.map || !zone) return;
-
       this.activeZoneId = zone.id;
 
       if (zone.lat && zone.lng) {
-        const targetLat = parseFloat(zone.lat);
-        const targetLng = parseFloat(zone.lng);
-        const targetZoom = zone.default_zoom || 15;
-
-        // Thực hiện hiệu ứng bay flyTo mượt mà
-        this.map.flyTo([targetLat, targetLng], targetZoom, {
+        this.map.flyTo([parseFloat(zone.lat), parseFloat(zone.lng)], zone.default_zoom || 15, {
           animate: true,
           duration: 1.5
         });
       }
     },
 
+    // =========================================================================
+    // 4. VẼ CÁC LỚP BẢN ĐỒ (LAYERS BUILDER)
+    // =========================================================================
+    drawBoundaries() {
+      if (!this.map || !this.boundariesData) return;
+      let geoData = this.boundariesData;
+      if (typeof geoData === 'string') {
+        try { geoData = JSON.parse(geoData); } catch (e) { return; }
+      }
+      if (!geoData.features?.length) return;
+
+      leafletLayers.boundaries = L.geoJSON(geoData, {
+        pane: 'boundariesPane',
+        interactive: false,
+        style: (feature) => ({
+          pane: 'boundariesPane',
+          color: feature.properties?.fill_color || '#e11d48',
+          weight: 3.5,
+          dashArray: '10, 6',
+          opacity: 0.95
+        })
+      }).addTo(this.map);
+    },
+
     drawPlots() {
-      if (!this.plotsData || !this.plotsData.features.length) return;
+      if (!this.plotsData?.features?.length) return;
 
       leafletLayers.plots = L.geoJSON(this.plotsData, {
         interactive: true,
         style: (feature) => {
           const p = feature.properties || {};
-          // Lấy màu từ Database, nếu không có thì fallback theo land_type
           const plotColor = p.color || (p.land_type === 'commercial' ? '#e11d48' : '#b45309');
-
           return {
             fillColor: plotColor,
             fillOpacity: 0.38,
             color: plotColor,
-            weight: 1.5,
+            weight: 1.5
           };
         },
         onEachFeature: (feature, layer) => {
@@ -416,10 +505,7 @@ export default {
             });
           }
 
-          const landTypeName = p.land_type === 'commercial' 
-            ? '🏬 Đất Thương mại Dịch vụ' 
-            : '🏭 Đất Công nghiệp';
-
+          const landTypeName = p.land_type === 'commercial' ? '🏬 Đất TMDV' : '🏭 Đất Công nghiệp';
           const plotColor = p.color || (p.land_type === 'commercial' ? '#e11d48' : '#b45309');
 
           layer.bindPopup(`
@@ -427,7 +513,7 @@ export default {
               <h4 style="margin: 0 0 6px 0; color: ${plotColor};">🗺️ Lô đất: ${p.code}</h4>
               <p style="margin: 3px 0;"><b>Loại đất:</b> <span style="font-weight: 700; color: ${plotColor};">${landTypeName}</span></p>
               <p style="margin: 3px 0;"><b>Diện tích:</b> ${p.total_area ? Number(p.total_area).toLocaleString('vi-VN') + ' m²' : '—'}</p>
-              <p style="margin: 3px 0;"><b>Mô tả / Trạng thái:</b> ${p.description || 'Chưa có thông tin'}</p>
+              <p style="margin: 3px 0;"><b>Mô tả:</b> ${p.description || 'Chưa có thông tin'}</p>
             </div>
           `);
 
@@ -443,20 +529,17 @@ export default {
 
     drawCompanyLands() {
       const data = this.companyLandsData || this.$page?.props?.companyLandsData;
-      if (!data || !data.features || !data.features.length) return;
+      if (!data?.features?.length) return;
 
-      // 🌟 Tạo renderer chuyên biệt cho pane này
       const landRenderer = L.svg({ pane: 'companyLandsPane' });
 
       leafletLayers.companyLands = L.geoJSON(data, {
         pane: 'companyLandsPane',
-        renderer: landRenderer, // 🌟 Gán renderer trực tiếp
-        interactive: true,      // 🌟 Bắt buộc có để Leaflet lắng nghe sự kiện
+        renderer: landRenderer,
+        interactive: true,
         style: (feature) => {
           const p = feature.properties || {};
-          // const compColor = p.company_color || '#003099';
           const compColor = '#003099';
-
           return {
             pane: 'companyLandsPane',
             fillColor: compColor,
@@ -464,24 +547,21 @@ export default {
             color: compColor,
             weight: 2,
             dashArray: p.status === 'under_construction' ? '5, 5' : null,
-            interactive: true   // 🌟 Đảm bảo style kích hoạt tương tác
+            interactive: true
           };
         },
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
-
-          // 1. Tooltip (Đảm bảo nhãn không chặn click chuột)
           if (p.land_code) {
-            layer.bindTooltip(`🏢 ${p.company_name || ''}</small>`, {
+            layer.bindTooltip(`🏢 ${p.company_name || ''}`, {
               pane: 'tooltipPane',
               permanent: true,
               direction: 'center',
               className: 'company-land-label',
-              interactive: false // 🌟 Không cho phép tooltip nhận sự kiện chuột
+              interactive: false
             });
           }
 
-          // 2. Nội dung Popup
           const leaseEnd = p.lease_end_date ? new Date(p.lease_end_date).toLocaleDateString('vi-VN') : '---';
           const areaDisplay = p.leased_area 
             ? Number(p.leased_area).toLocaleString('vi-VN') + ' m²' 
@@ -494,29 +574,16 @@ export default {
               </h4>
               <p style="margin: 3px 0;"><b>Mã thửa đất:</b> <span style="font-family: monospace; font-weight: bold; color: #0284c7;">${p.land_code}</span></p>
               <p style="margin: 3px 0;"><b>Thuộc lô QH:</b> ${p.plot_code ? 'Lô ' + p.plot_code : 'Chưa gắn'}</p>
-              <p style="margin: 3px 0;"><b>Số bìa đỏ:</b> <span style="color: #b45309; font-weight: bold;">${p.certificate_number || 'Đang cấp đổi/Chưa có'}</span></p>
-              <p style="margin: 3px 0;"><b>Hợp đồng thuê:</b> ${p.contract_number || '---'}</p>
+              <p style="margin: 3px 0;"><b>Số bìa đỏ:</b> <span style="color: #b45309; font-weight: bold;">${p.certificate_number || 'Đang cấp đổi'}</span></p>
               <p style="margin: 3px 0;"><b>Thời hạn thuê đến:</b> <b>${leaseEnd}</b></p>
               <p style="margin: 3px 0;"><b>Diện tích:</b> <b style="color: #059669;">${areaDisplay}</b></p>
-              <p style="margin: 3px 0;"><b>Mục đích XD:</b> ${p.land_purpose || 'Sản xuất công nghiệp'}</p>
               <p style="margin: 3px 0;"><b>Hiện trạng:</b> ${p.status === 'active' ? '🟢 Đang sản xuất' : '🟡 Đang xây dựng'}</p>
             </div>
           `);
 
-          // 3. Sự kiện chuột
           layer.on({
-            mouseover: (e) => {
-              e.target.setStyle({ fillOpacity: 0.8, weight: 3.5 });
-            },
-            mouseout: (e) => {
-              e.target.setStyle({ fillOpacity: 0.55, weight: 2 });
-            },
-            click: (e) => {
-              // Đưa polygon lên đầu trong pane để viền nổi rõ
-              if (layer.bringToFront) {
-                layer.bringToFront();
-              }
-            }
+            mouseover: (e) => { e.target.setStyle({ fillOpacity: 0.8, weight: 3.5 }); },
+            mouseout: (e) => { e.target.setStyle({ fillOpacity: 0.55, weight: 2 }); }
           });
         }
       });
@@ -524,26 +591,49 @@ export default {
       this.companyLandsGeoJsonLayer = leafletLayers.companyLands;
     },
 
-    drawGreenery() {
-      if (!this.greeneryData || !this.greeneryData.features) return;
-      this.greeneryLabelMarkers = [];
+    /**
+     * 🌟 Hàm dùng chung vẽ cảnh quan môi trường (Cây xanh, Mặt nước)
+     */
+    drawLandscape(type) {
+      const isGreenery = type === 'greenery';
+      const data = isGreenery ? this.greeneryData : this.waterBodiesData;
+      if (!data?.features) return;
 
-      leafletLayers.greenery = L.geoJSON(this.greeneryData, {
+      const config = isGreenery ? {
+        fillColor: '#22c55e',
+        color: '#15803d',
+        icon: '🌳',
+        title: 'Vùng Cây Xanh',
+        labelClass: 'greenery-label',
+        targetLayerKey: 'greenery'
+      } : {
+        fillColor: '#0284c7',
+        color: '#0369a1',
+        icon: '🌊',
+        title: 'Mặt Nước / Hồ Điều Hòa',
+        labelClass: 'water-label',
+        targetLayerKey: 'waterBodies'
+      };
+
+      if (isGreenery) this.greeneryLabelMarkers = [];
+      else this.waterLabelMarkers = [];
+
+      leafletLayers[config.targetLayerKey] = L.geoJSON(data, {
         interactive: true,
         style: {
-          fillColor: '#22c55e',
-          fillOpacity: 0.5,
-          color: '#15803d',
+          fillColor: config.fillColor,
+          fillOpacity: isGreenery ? 0.5 : 0.6,
+          color: config.color,
           weight: 1.5
         },
         onEachFeature: (feature, layer) => {
           const p = feature.properties;
           if (p.code) {
-            this.addPolygonLabel(feature, `🌳 ${p.code}`, 'greenery-label');
+            this.addPolygonLabel(feature, `${config.icon} ${p.code}`, config.labelClass);
           }
           layer.bindPopup(`
             <div style="font-size: 13px; min-width: 170px;">
-              <b style="color: #15803d;">🌳 Vùng Cây Xanh: ${p.code}</b><br>
+              <b style="color: ${config.color};">${config.icon} ${config.title}: ${p.code}</b><br>
               <b>Diện tích:</b> ${p.area ? Number(p.area).toLocaleString('vi-VN') + ' m²' : '—'}<br>
               <b>Mô tả:</b> ${p.description || 'Chưa cập nhật'}
             </div>
@@ -551,50 +641,19 @@ export default {
         }
       }).addTo(this.map);
 
-      this.greeneryGeoJsonLayer = leafletLayers.greenery;
-    },
-
-    drawWaterBodies() {
-      if (!this.waterBodiesData || !this.waterBodiesData.features) return;
-      this.waterLabelMarkers = [];
-
-      leafletLayers.waterBodies = L.geoJSON(this.waterBodiesData, {
-        interactive: true,
-        style: {
-          fillColor: '#0284c7',
-          fillOpacity: 0.6,
-          color: '#0369a1',
-          weight: 1.5
-        },
-        onEachFeature: (feature, layer) => {
-          const p = feature.properties;
-          if (p.code) {
-            this.addPolygonLabel(feature, `🌊 ${p.code}`, 'water-label');
-          }
-          layer.bindPopup(`
-            <div style="font-size: 13px; min-width: 170px;">
-              <b style="color: #0284c7;">🌊 Mặt Nước / Hồ: ${p.code}</b><br>
-              <b>Diện tích:</b> ${p.area ? Number(p.area).toLocaleString('vi-VN') + ' m²' : '—'}<br>
-              <b>Ghi chú:</b> ${p.description || 'Chưa cập nhật'}
-            </div>
-          `);
-        }
-      }).addTo(this.map);
-
-      this.waterGeoJsonLayer = leafletLayers.waterBodies;
+      if (isGreenery) this.greeneryGeoJsonLayer = leafletLayers.greenery;
+      else this.waterGeoJsonLayer = leafletLayers.waterBodies;
     },
 
     drawRoads() {
-      if (!this.roadsData || !this.roadsData.features.length) return;
+      if (!this.roadsData?.features?.length) return;
 
       leafletLayers.roads = L.geoJSON(this.roadsData, {
         interactive: true,
         style: (feature) => {
           const widthInMeters = feature.properties.road_width || feature.properties.right_of_way || 10;
-          
           return {
             color: '#FFE082',
-            // 🌟 Tính weight theo mét thực tế từ Database
             weight: this.getWeightInPixels(widthInMeters),
             opacity: 0.85
           };
@@ -615,135 +674,13 @@ export default {
       this.roadsGeoJsonLayer = leafletLayers.roads;
     },
 
-    getWeightInPixels(widthInMeters) {
-      if (!this.map || !widthInMeters) return 3; // Mặc định 3px nếu không có dữ liệu
-      
-      const zoom = this.map.getZoom();
-      const lat = this.map.getCenter().lat;
-      
-      // Tỉ lệ Mét/Pixel tại vĩ độ hiện tại
-      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
-      
-      // Trả về số Pixel (đảm bảo tối thiểu 1.5px để không bị biến mất khi zoom xa)
-      return Math.max(3, widthInMeters / metersPerPixel);
-    },
-
-     // Hàm cập nhật nét vẽ khi Zoom
-    updateRoadsWidth() {
-      if (!this.roadsGeoJsonLayer) return;
-
-      this.roadsGeoJsonLayer.eachLayer((layer) => {
-        if (layer.feature && layer.setStyle) {
-          const widthInMeters = layer.feature.properties.road_width || layer.feature.properties.right_of_way || 10;
-          layer.setStyle({
-            weight: this.getWeightInPixels(widthInMeters)
-          });
-        }
-      });
-
-      // 🌟 GỌI LUÔN CÁC HẠ TẦNG CÒN LẠI TẠI ĐÂY
-      this.updateInfrastructureSizes();
-    },
-
-    // 1. Quy đổi bán kính (mét thực tế) thành pixel cho các điểm Point (Hố ga, Cột đèn)
-    getPointRadiusInPixels(radiusInMeters, minPx = 2, maxPx = 6) {
-      if (!this.map || !radiusInMeters) return minPx;
-      const zoom = this.map.getZoom();
-      const lat = this.map.getCenter().lat;
-      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
-      
-      const calcPx = radiusInMeters / metersPerPixel;
-      return Math.min(maxPx, Math.max(minPx, calcPx));
-    },
-
-    // 2. Quy đổi kích thước hình vuông (mét thực tế) thành pixel cho Tủ điện
-    getCabinetSizeInPixels(sizeInMeters = 1.8, minPx = 12, maxPx = 24) {
-      if (!this.map) return minPx;
-      const zoom = this.map.getZoom();
-      const lat = this.map.getCenter().lat;
-      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
-      
-      const calcPx = sizeInMeters / metersPerPixel;
-      return Math.round(Math.min(maxPx, Math.max(minPx, calcPx)));
-    },
-
-    updateInfrastructureSizes() {
-      if (!this.map) return;
-
-      // 1. Tính toán các kích thước chuẩn tại mức zoom hiện tại
-      const wastewaterR = this.getPointRadiusInPixels(3.0, 3.5, 9.0);
-      const rainwaterR  = this.getPointRadiusInPixels(2.6, 3.0, 8.5);
-      const poleR       = this.getPointRadiusInPixels(2.4, 3.0, 8.0);
-      const cableWeight = this.getWeightInPixels(0.3); // Tăng độ dày cáp lên tương đương 1m           // Cáp chiếu sáng (khoảng 0.6m thực tế)
-      const cabSize     = this.getCabinetSizeInPixels(2.8, 12, 22); // Tủ điện
-
-      // Co giãn hệ thống Nước thải (cả Cống và Hố ga)
-      if (leafletLayers.wastewater) {
-        leafletLayers.wastewater.eachLayer((subGroup) => {
-          if (subGroup.eachLayer) {
-            subGroup.eachLayer((layer) => {
-              if (layer.setRadius) layer.setRadius(wastewaterR);
-              if (layer.setStyle && layer.feature && layer.feature.geometry.type.includes('Line')) {
-                // TĂNG ĐỘ DÀY CỐNG NƯỚC THẢI: lấy kích thước tính toán + 2px (hoặc nhân hệ số 1.3)
-                const pipeWeight = Math.max(3, this.getPipeWeightInPixels(layer.feature) + 1.5);
-                layer.setStyle({ weight: pipeWeight });
-              }
-            });
-          }
-        });
-      }
-
-      // Co giãn hệ thống Nước mưa (cả Cống và Hố ga)
-      if (leafletLayers.rainwater) {
-        leafletLayers.rainwater.eachLayer((subGroup) => {
-          if (subGroup.eachLayer) {
-            subGroup.eachLayer((layer) => {
-              if (layer.setRadius) layer.setRadius(rainwaterR);
-              if (layer.setStyle && layer.feature && layer.feature.geometry.type.includes('Line')) {
-                const pipeWeight = Math.max(3.5, this.getPipeWeightInPixels(layer.feature) + 2);
-                layer.setStyle({ weight: pipeWeight });
-              }
-            });
-          }
-        });
-      }
-
-      // 🌟 Co giãn toàn bộ hệ thống chiếu sáng (Cáp, Cột đèn, Tủ điện)
-      if (leafletLayers.lightingSystem) {
-        leafletLayers.lightingSystem.eachLayer((subGroup) => {
-          if (subGroup.eachLayer) {
-            subGroup.eachLayer((l) => {
-              // Cột đèn (CircleMarker)
-              if (l.setRadius) {
-                l.setRadius(poleR);
-              }
-              // Tuyến cáp (LineString Polyline)
-              if (l.setStyle && l.feature && l.feature.geometry.type.includes('Line')) {
-                l.setStyle({ weight: Math.max(1, Math.min(2, cableWeight)) });
-              }
-              // Tủ điện (DivIcon Marker)
-              if (l.setIcon && l.feature && l.feature.geometry.type === 'Point') {
-                l.setIcon(L.divIcon({
-                  className: 'custom-cabinet-marker',
-                  html: `<div class="cabinet-icon-box" style="width: ${cabSize}px; height: ${cabSize}px; font-size: ${Math.round(cabSize * 0.55)}px;" title="${l.feature?.properties?.code || ''}">⚡</div>`,
-                  iconSize: [cabSize, cabSize],
-                  iconAnchor: [Math.round(cabSize / 2), Math.round(cabSize / 2)]
-                }));
-              }
-            });
-          }
-        });
-      }
-    },
-
     drawFactories() {
-      if (!this.factoriesData || !this.factoriesData.features) return;
+      if (!this.factoriesData?.features) return;
 
-      // 🌟 1. Khởi tạo Renderer riêng biệt gắn chặt vào factoriesPane
       const factoryRenderer = L.svg({ pane: 'factoriesPane' });
 
       leafletLayers.factories = L.geoJSON(this.factoriesData, {
-        pane: 'factoriesPane',       // 🌟 2. Chỉ định rõ pane cấp layer
+        pane: 'factoriesPane',
         renderer: factoryRenderer,
         interactive: true,
         style: (feature) => {
@@ -789,7 +726,6 @@ export default {
       this.factoriesGeoJsonLayer = leafletLayers.factories;
     },
 
-    // 🧪 VẼ HỆ THỐNG NƯỚC THẢI (GỒM CỐNG D400 + MŨI TÊN + HỐ GA)
     drawWastewater() {
       leafletLayers.wastewater = this.createDrainageSystemLayer({
         pipeType: 'wastewater',
@@ -797,7 +733,6 @@ export default {
         pipeColor: '#9333ea',
         arrowFillColor: '#581c87',
         defaultMaterial: 'HDPE 2 vách',
-
         manholesData: this.wastewaterManholesData,
         manholeTitle: '🧪 Hố Ga Nước Thải',
         manholeColor: '#800080',
@@ -807,7 +742,6 @@ export default {
       });
     },
 
-    // 🌧️ VẼ HỆ THỐNG NƯỚC MƯA (GỒM CỐNG HỘP/D800 + MŨI TÊN + HỐ GA)
     drawRainwater() {
       leafletLayers.rainwater = this.createDrainageSystemLayer({
         pipeType: 'rainwater',
@@ -815,7 +749,6 @@ export default {
         pipeColor: '#0284c7',
         arrowFillColor: '#0369a1',
         defaultMaterial: 'BTCT',
-
         manholesData: this.rainwaterManholesData,
         manholeTitle: '🌧️ Hố Ga Nước Mưa',
         manholeColor: '#007bff',
@@ -826,17 +759,14 @@ export default {
     },
 
     /**
-     * 🌟 Hàm dùng chung khởi tạo toàn bộ Layer Hệ thống Thoát nước (Cống + Mũi tên + Hố ga)
-     * @param {Object} config Cấu hình màu sắc, dữ liệu và nhãn đặc thù của từng hệ thống
+     * 🌟 Hàm dùng chung khởi tạo Hệ thống Thoát nước (Cống + Mũi tên MultiLine + Hố ga)
      */
     createDrainageSystemLayer(config) {
       const layers = [];
       const pipeRenderer = L.svg({ pane: 'pipesPane' });
       const manholeRenderer = L.svg({ pane: 'pointsPane' });
 
-      // ----------------------------------------------------------------------
-      // 1. TÁCH DỮ LIỆU ĐƯỜNG CỐNG THEO TYPE
-      // ----------------------------------------------------------------------
+      // 1. Tuyến đường cống
       const filteredPipes = {
         type: 'FeatureCollection',
         features: (this.drainagePipesData?.features || []).filter(
@@ -877,44 +807,37 @@ export default {
             `);
 
             layer.on({
-              mouseover: (e) => {
-                e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 });
-              },
-              mouseout: (e) => {
-                e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 });
-              }
+              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 }); },
+              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 }); }
             });
           }
         });
 
         layers.push(pipeLayer);
 
-        // --------------------------------------------------------------------
-        // 2. VẼ MŨI TÊN DÒNG CHẢY (TỰ ĐỘNG LỌC BỎ CÁC ĐOẠN NGẮN)
-        // --------------------------------------------------------------------
+        // 2. Mũi tên dòng chảy (Hỗ trợ MultiLineString, bỏ đoạn < 30m)
         if (typeof L.polylineDecorator === 'function') {
           const arrowDecors = [];
 
           pipeLayer.eachLayer((pLayer) => {
-            if (pLayer instanceof L.Polyline) {
-              const latlngs = pLayer.getLatLngs();
-              // if (!latlngs || latlngs.length < 2) return;
+            if (!(pLayer instanceof L.Polyline)) return;
+            const rawLatLngs = pLayer.getLatLngs();
+            if (!rawLatLngs || !rawLatLngs.length) return;
 
-              // Ưu tiên chiều dài thực tế (m), nếu thiếu tự tính theo tọa độ
-              let lengthInMeters = pLayer.feature?.properties?.length_m;
-              if (!lengthInMeters) {
-                lengthInMeters = 0;
-                for (let i = 0; i < latlngs.length - 1; i++) {
-                  lengthInMeters += latlngs[i].distanceTo(latlngs[i + 1]);
-                }
+            const subSegments = Array.isArray(rawLatLngs[0]) ? rawLatLngs : [rawLatLngs];
+
+            subSegments.forEach((segment) => {
+              if (!segment || segment.length < 2) return;
+
+              let segLength = 0;
+              for (let i = 0; i < segment.length - 1; i++) {
+                segLength += segment[i].distanceTo(segment[i + 1]);
               }
 
-              // 🛑 Đoạn ngắn hơn 15m: Bỏ qua hoàn toàn, không vẽ mũi tên
-              if (lengthInMeters < 30) return;
+              // 🛑 Đoạn ngắn hơn 30m: bỏ qua hoàn toàn
+              if (segLength < 30) return;
 
-              // 📍 Đoạn từ 15m - 35m: Chỉ vẽ đúng 1 mũi tên tại tâm 50%
-              // 📍 Đoạn dài > 35m: Bắt đầu từ 25m và lặp cách nhau 55m
-              const patternConfig = lengthInMeters < 35
+              const patternConfig = segLength < 50
                 ? [{
                     offset: '50%',
                     repeat: 0,
@@ -932,7 +855,7 @@ export default {
                   }]
                 : [{
                     offset: '25m',
-                    repeat: '55m',
+                    repeat: '50m',
                     symbol: L.Symbol.arrowHead({
                       pixelSize: 8,
                       polygon: true,
@@ -946,9 +869,8 @@ export default {
                     })
                   }];
 
-              const arrow = L.polylineDecorator(pLayer, { patterns: patternConfig });
-              arrowDecors.push(arrow);
-            }
+              arrowDecors.push(L.polylineDecorator(segment, { patterns: patternConfig }));
+            });
           });
 
           if (arrowDecors.length) {
@@ -957,9 +879,7 @@ export default {
         }
       }
 
-      // ----------------------------------------------------------------------
-      // 3. VẼ HỐ GA (CircleMarker gắn chặt vào pointsPane)
-      // ----------------------------------------------------------------------
+      // 3. Hố ga
       if (config.manholesData?.features?.length) {
         const manholeLayer = L.geoJSON(config.manholesData, {
           pane: 'pointsPane',
@@ -996,10 +916,7 @@ export default {
               </div>
             `);
 
-            layer.on('click', (e) => {
-              L.DomEvent.stopPropagation(e);
-            });
-
+            layer.on('click', (e) => { L.DomEvent.stopPropagation(e); });
             layer.on({
               mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
               mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
@@ -1013,420 +930,13 @@ export default {
       return L.featureGroup(layers);
     },
 
-    //  hàm tính độ dày đường cống
-    getPipeWeightInPixels(feature) {
-      if (!this.map) return 2.5;
-      const p = feature.properties || {};
-
-      let sizeInMeters = 0.35; // Mặc định D350 = 0.35m
-      if (p.cross_section === 'box' && p.width) {
-        sizeInMeters = p.width / 1000;
-      } else if (p.diameter) {
-        sizeInMeters = p.diameter / 1000;
-      }
-
-      const zoom = this.map.getZoom();
-      const lat = this.map.getCenter().lat;
-      const metersPerPixel = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
-
-      const calcPx = sizeInMeters / metersPerPixel;
-
-      // 🌟 KHÓA BIÊN ĐỘ: Không quá 12px khi zoom gần, không dưới 1.5px khi zoom xa
-      return Math.min(12, Math.max(1.5, calcPx));
-    },
-
-    //  Hàm vẽ chú thích
-    addMapLegend() {
-      const legend = L.control({ position: 'bottomleft' });
-
-      legend.onAdd = () => {
-        const div = L.DomUtil.create('div', 'custom-map-legend collapsed');
-        div.id = 'map-legend-box';
-
-        div.innerHTML = `
-          <!-- 1. NÚT HEADER ĐIỀU KHIỂN BẬT / TẮT (TOGGLE) -->
-          <div class="legend-header" id="legend-toggle-btn" title="Click để ẩn/hiện chú thích">
-            <div class="legend-header-title">
-              <span class="legend-header-icon">📌</span>
-              <span class="legend-title-text">CHÚ THÍCH BẢN ĐỒ</span>
-            </div>
-            <span class="legend-toggle-arrow">▲</span>
-          </div>
-
-          <!-- 2. NỘI DUNG CHÚ THÍCH ĐẦY ĐỦ CÁC HẠ TẦNG -->
-          <div class="legend-content">
-            <!-- NHÓM QUY HOẠCH & ĐẤT ĐAI -->
-            <div class="legend-group-title">QUY HOẠCH & XÂY DỰNG</div>
-            <div class="legend-item">
-              <span class="legend-line boundary-line"></span>
-              <span class="legend-text">Ranh giới quy hoạch</span>
-            </div>
-           <div class="legend-item">
-              <span class="legend-box" style="background-color: #b45309; opacity: 0.7; border: 1px solid #f55b02;"></span>
-              <span class="legend-text">Đất công nghiệp</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-box" style="background-color: #e11d48; opacity: 0.7; border: 1px solid #be123c;"></span>
-              <span class="legend-text">Đất thương mại dịch vụ</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-box" style="background-color: #003099; opacity: 0.6; border: 1.5px solid #003099;"></span>
-              <span class="legend-text">Đất doanh nghiệp thuê</span>
-            </div>
-
-            <!-- NHÓM CẢNH QUAN & GIAO THÔNG -->
-            <div class="legend-group-title">GIAO THÔNG & CẢNH QUAN</div>
-            <div class="legend-item">
-              <span class="legend-line road-line"></span>
-              <span class="legend-text">Đường nội bộ KCN</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-box greenery-box"></span>
-              <span class="legend-text">Khuôn viên cây xanh</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-box water-box"></span>
-              <span class="legend-text">Mặt nước / Kênh điều hòa</span>
-            </div>
-
-            <!-- NHÓM THOÁT NƯỚC (HỐ GA + CỐNG) -->
-            <div class="legend-group-title">HỆ THỐNG THOÁT NƯỚC</div>
-            <div class="legend-item">
-              <span class="legend-point rainwater-point"></span>
-              <span class="legend-line rain-pipe-line"></span>
-              <span class="legend-text">Cống & Hố ga nước mưa</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-point wastewater-point"></span>
-              <span class="legend-line waste-pipe-line"></span>
-              <span class="legend-text">Cống & Hố ga nước thải</span>
-            </div>
-
-            <!-- NHÓM HỆ THỐNG CHIẾU SÁNG -->
-            <div class="legend-group-title">HỆ THỐNG CHIẾU SÁNG</div>
-            <div class="legend-item">
-              <span class="legend-icon-mini">⚡</span>
-              <span class="legend-text">Tủ điện chiếu sáng</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-point pole-point"></span>
-              <span class="legend-text">Cột đèn chiếu sáng LED</span>
-            </div>
-            <div class="legend-item">
-              <span class="legend-line cable-line"></span>
-              <span class="legend-text">Tuyến cáp điện ngầm</span>
-            </div>
-          </div>
-        `;
-
-        // Chặn nổi bọt sự kiện để khi click vào legend không kích hoạt click lên bản đồ
-        L.DomEvent.disableClickPropagation(div);
-        L.DomEvent.disableScrollPropagation(div);
-
-        // Bắt sự kiện Toggle khi click vào header
-        const toggleBtn = div.querySelector('#legend-toggle-btn');
-        L.DomEvent.on(toggleBtn, 'click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          div.classList.toggle('collapsed');
-        });
-
-        return div;
-      };
-
-      legend.addTo(this.map);
-    },
-
-    checkAllLabelsVisibility() {
-      if (!this.map) return;
-      const currentZoom = this.map.getZoom();
-
-      const layersToCheck = [
-        { layer: this.roadsGeoJsonLayer, minZoom: 17, maxZoom: 20},
-        { layer: this.plotsGeoJsonLayer, minZoom: 17, maxZoom: 18},
-        { layer: this.companyLandsGeoJsonLayer, minZoom: 18, maxZoom: 20},
-        { layer: this.factoriesGeoJsonLayer, minZoom: 18, maxZoom: 20}
-      ];
-
-      layersToCheck.forEach(item => {
-        if (!item.layer) return;
-        const show = currentZoom >= item.minZoom && currentZoom < item.maxZoom;
-        item.layer.eachLayer(l => {
-          if (l.getTooltip()) {
-            if (show) l.openTooltip();
-            else l.closeTooltip();
-          }
-        });
-      });
-
-      const MIN_ZOOM = 17;
-      const show = currentZoom >= MIN_ZOOM;
-
-      this.greeneryLabelMarkers.forEach(marker => {
-        if (marker && marker.getTooltip()) {
-          if (show) marker.openTooltip();
-          else marker.closeTooltip();
-        }
-      });
-
-      this.waterLabelMarkers.forEach(marker => {
-        if (marker && marker.getTooltip()) {
-          if (show) marker.openTooltip();
-          else marker.closeTooltip();
-        }
-      });
-    },
-
-    handleLayerChange({ name, config }) {
-      // Ghi nhớ người dùng chủ động Bật hay Tắt trên sidebar
-      if (this.userLayerVisibility[name] !== undefined) {
-        this.userLayerVisibility[name] = config.visible;
-      }
-
-      const layer = leafletLayers[name];
-      if (!layer) return;
-
-      if (config.visible) {
-        if (name === 'surroundingLocations') {
-          const isInRange = currentZoom >= 14 && currentZoom < 16;
-          if (isInRange && !this.map.hasLayer(layer)) {
-            this.map.addLayer(layer);
-          }
-        } else {
-          // Chỉ thêm vào map nếu mức zoom hiện tại >= 16 (với các lớp chi tiết)
-          const detailLayers = ['lightingSystem', 'wastewater', 'rainwater'];
-          const currentZoom = this.map.getZoom();
-
-          if (!detailLayers.includes(name) || currentZoom >= 16) {
-            if (!this.map.hasLayer(layer)) {
-              this.map.addLayer(layer);
-            }
-          }
-          console.log(config);
-          if (config.name === "greenery") {
-            this.greeneryLabelMarkers.forEach(marker => {
-              marker.openTooltip();
-            });
-          } else if (config.name === "waterBodies") {
-            this.waterLabelMarkers.forEach(marker => {
-              marker.openTooltip();
-            });
-          }
-        }
-      } else {
-        if (this.map.hasLayer(layer)) {
-          this.map.removeLayer(layer);
-        }
-        if (config.name === "greenery") {
-          this.greeneryLabelMarkers.forEach(marker => {
-            marker.closeTooltip();
-          });
-        } else if (config.name === "waterBodies") {
-          this.waterLabelMarkers.forEach(marker => {
-            marker.closeTooltip();
-          });
-        }
-        return;
-      }
-
-      layer.eachLayer((subLayer) => {
-        if (subLayer.setStyle) {
-          subLayer.setStyle({
-            fillOpacity: config.opacity,
-            opacity: config.opacity
-          });
-        }
-      });
-
-      this.bringManholesToFront();
-      this.checkAllLabelsVisibility();
-    },
-
-    // 🌟 TỰ ĐỘNG ẨN KHI ZOOM < 16, HIỆN KHI ZOOM >= 16
-    checkDetailLayersVisibility() {
-      if (!this.map) return;
-      const currentZoom = this.map.getZoom();
-      const MIN_DETAIL_ZOOM = 16;
-
-      // Danh sách 5 lớp hạ tầng chi tiết cần ẩn/hiện theo zoom
-      const detailLayerKeys = [
-        'lightingSystem', // 🌟 Quản lý toàn bộ mạng chiếu sáng
-        'wastewater',
-        'rainwater'
-      ];
-
-      detailLayerKeys.forEach((key) => {
-        const layer = leafletLayers[key];
-        const userWantsVisible = this.userLayerVisibility[key];
-
-        if (!layer) return;
-
-        // Nếu người dùng BẬT trên sidebar VÀ zoom >= 16 -> HIỂN THỊ
-        if (userWantsVisible && currentZoom >= MIN_DETAIL_ZOOM) {
-          if (!this.map.hasLayer(layer)) {
-            this.map.addLayer(layer);
-          }
-        } else {
-          // Nếu zoom < 16 hoặc người dùng đã TẮT ở sidebar -> ẨN ĐI
-          if (this.map.hasLayer(layer)) {
-            this.map.removeLayer(layer);
-          }
-        }
-      });
-
-      // 2. 🌟 LỚP VÙNG LÂN CẬN (Zoom < 16 mới HIỆN, Zoom >= 16 thì ẨN)
-      const surroundingLayer = leafletLayers.surroundingLocations;
-      const userWantsSurrounding = this.userLayerVisibility.surroundingLocations ?? true;
-
-      if (surroundingLayer) {
-        const isInSurroundingZoomRange = currentZoom >= 14 && currentZoom < 16;
-        if (userWantsSurrounding && isInSurroundingZoomRange) {
-          if (!this.map.hasLayer(surroundingLayer)) {
-            this.map.addLayer(surroundingLayer);
-          }
-        } else {
-          if (this.map.hasLayer(surroundingLayer)) {
-            this.map.removeLayer(surroundingLayer);
-          }
-        }
-      }
-    },
-
-    getPolygonStyle(status, opacity = 0.6) {
-      const baseStyle = { fillOpacity: opacity, opacity: opacity, weight: 2 };
-      switch (status) {
-        case 'rented': return { ...baseStyle, color: '#dc3545', fillColor: '#dc3545' };
-        case 'available': return { ...baseStyle, color: '#28a745', fillColor: '#28a745' };
-        case 'under_construction': return { ...baseStyle, color: '#ffc107', fillColor: '#ffc107' };
-        default: return { ...baseStyle, color: '#6c757d', fillColor: '#6c757d' };
-      }
-    },
-
-    formatStatus(status) {
-      if (status === 'rented') return 'Đang hoạt động';
-      if (status === 'available') return 'Đang trống / Cần đầu tư';
-      return 'Đang xây dựng';
-    },
-
-    getCurrentLocation() {
-      if (!navigator.geolocation) {
-        alert("Trình duyệt của anh không hỗ trợ tính năng định vị GPS.");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-
-          if (this.currentLocationMarker) {
-            this.map.removeLayer(this.currentLocationMarker);
-          }
-
-          this.currentLocationMarker = L.circleMarker([lat, lng], {
-            radius: 9,
-            fillColor: '#007bff',
-            color: '#ffffff',
-            weight: 3,
-            opacity: 1,
-            fillOpacity: 1
-          }).addTo(this.map);
-
-          this.currentLocationMarker.bindPopup("<b>📍 Vị trí hiện tại của anh</b>").openPopup();
-          this.map.setView([lat, lng], 17);
-        },
-        (error) => {
-          switch (error.code) {
-            case error.PERMISSION_DENIED: alert("Anh chưa cho phép truy cập vị trí GPS."); break;
-            case error.POSITION_UNAVAILABLE: alert("Không thể xác định vị trí GPS."); break;
-            case error.TIMEOUT: alert("Thời gian yêu cầu định vị quá hạn."); break;
-            default: alert("Lỗi định vị không xác định."); break;
-          }
-        },
-        { enableHighAccuracy: true }
-      );
-    },
-
-    addPolygonLabel(feature, labelText, cssClass) {
-      if (!feature || !feature.geometry || !labelText) return null;
-
-      try {
-        const pt = pointOnFeature(feature);
-        const lat = pt.geometry.coordinates[1];
-        const lng = pt.geometry.coordinates[0];
-
-        const labelMarker = L.circleMarker([lat, lng], {
-          interactive: false,
-          radius: 0,
-          opacity: 0,
-          fillOpacity: 0
-        }).addTo(this.map);
-
-        labelMarker.bindTooltip(labelText, {
-          permanent: true,
-          direction: 'center',
-          className: cssClass
-        });
-
-        if (cssClass === 'greenery-label') {
-          this.greeneryLabelMarkers.push(labelMarker);
-        } else if (cssClass === 'water-label') {
-          this.waterLabelMarkers.push(labelMarker);
-        }
-
-        return labelMarker;
-      } catch (error) {
-        console.warn('Không thể tính trọng tâm Polygon bằng Turf:', error);
-        return null;
-      }
-    },
-
-    drawBoundaries() {
-      if (!this.map || !this.boundariesData) return;
-
-      // 🌟 Kiểm tra nếu pane chưa tồn tại thì tự động tạo luôn
-      if (!this.map.getPane('boundariesPane')) {
-        this.map.createPane('boundariesPane');
-        this.map.getPane('boundariesPane').style.zIndex = 390;
-        this.map.getPane('boundariesPane').style.pointerEvents = 'none';
-      }
-
-      let geoData = this.boundariesData;
-      if (typeof geoData === 'string') {
-        try {
-          geoData = JSON.parse(geoData);
-        } catch (e) {
-          console.error("Lỗi parse JSON boundariesData:", e);
-          return;
-        }
-      }
-
-      if (!geoData.features || !geoData.features.length) return;
-
-      leafletLayers.boundaries = L.geoJSON(geoData, {
-        pane: 'boundariesPane',
-        interactive: false,
-        style: (feature) => {
-          const p = feature.properties || {};
-          return {
-            pane: 'boundariesPane',
-            color: p.fill_color || '#e11d48',
-            weight: 3.5,
-            dashArray: '10, 6',
-            opacity: 0.95
-          };
-        }
-      }).addTo(this.map);
-    },
-
-    // ⚡ VẼ TOÀN BỘ HỆ THỐNG CHIẾU SÁNG (TỦ ĐIỆN + TUYẾN CÁP + CỘT ĐÈN)
     drawLightingSystem() {
       const layers = [];
       const initCabSize = this.getCabinetSizeInPixels(1.8, 12, 22);
 
-      // 1. TUYẾN CÁP CHIẾU SÁNG (LineString - Nằm ở lightingCablesPane: zIndex 435)
+      // 1. Cáp chiếu sáng
       if (this.lightingCablesData?.features?.length) {
         const cableRenderer = L.svg({ pane: 'lightingCablesPane' });
-
         const cablesLayer = L.geoJSON(this.lightingCablesData, {
           pane: 'lightingCablesPane',
           renderer: cableRenderer,
@@ -1464,14 +974,12 @@ export default {
             });
           }
         });
-
         layers.push(cablesLayer);
       }
 
-      // 2. CỘT ĐÈN CHIẾU SÁNG (Point - Nằm ở lightingPointsPane: zIndex 460)
+      // 2. Cột đèn chiếu sáng
       if (this.lightingPolesData?.features?.length) {
         const poleRenderer = L.svg({ pane: 'lightingPointsPane' });
-
         const polesLayer = L.geoJSON(this.lightingPolesData, {
           pane: 'lightingPointsPane',
           renderer: poleRenderer,
@@ -1499,7 +1007,7 @@ export default {
               <div style="font-size: 13px; min-width: 190px; font-family: sans-serif;">
                 <h4 style="margin: 0 0 6px 0; color: #ca8a04;">💡 CỘT ĐÈN CHIẾU SÁNG</h4>
                 <p style="margin: 3px 0;"><b>Mã cột:</b> <span style="color:#ca8a04; font-weight:bold;">${p.code}</span></p>
-                <p style="margin: 3px 0;"><b>Chiều cao:</b> ${p.height_m || 8} m (${p.arm_type || 'Cần đơn'})</p>
+                <p style="margin: 3px 0;"><b>Chiều cao:</b> ${p.height_m || 8} m</p>
                 <p style="margin: 3px 0;"><b>Loại bóng:</b> ${p.lamp_type || 'LED'} - <b>${p.wattage || 150}W</b></p>
                 <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'working' ? '🟢 Sáng tốt' : (p.status === 'broken' ? '🔴 Hỏng bóng' : '🟡 Bảo dưỡng')}</p>
                 <hr style="margin: 6px 0; border: none; border-top: 1px dashed #cbd5e1;">
@@ -1515,11 +1023,10 @@ export default {
             });
           }
         });
-
         layers.push(polesLayer);
       }
 
-      // 3. TỦ ĐIỆN CHIẾU SÁNG (Point DivIcon - Nằm ở lightingPointsPane: zIndex 460)
+      // 3. Tủ điện chiếu sáng
       if (this.lightingCabinetsData?.features?.length) {
         const cabinetsLayer = L.geoJSON(this.lightingCabinetsData, {
           pane: 'lightingPointsPane',
@@ -1546,8 +1053,7 @@ export default {
                 <p style="margin: 3px 0;"><b>Mã tủ:</b> <span style="color:#d97706; font-weight:bold;">${p.code}</span></p>
                 <p style="margin: 3px 0;"><b>Tên tủ:</b> ${p.name || '---'}</p>
                 <p style="margin: 3px 0;"><b>Công suất:</b> ${p.capacity_kva ? p.capacity_kva + ' kVA' : '—'}</p>
-                <p style="margin: 3px 0;"><b>Chế độ:</b> ${p.control_type === 'timer' ? '⏱️ Hẹn giờ' : (p.control_type === 'photocell' ? '☀️ Cảm biến quang' : '📡 Smart IoT')}</p>
-                <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'active' ? '🟢 Đang hoạt động' : '🔴 Ngừng cấp'}</p>
+                <p style="margin: 3px 0;"><b>Trạng thái:</b> ${p.status === 'active' ? '🟢 Hoạt động' : '🔴 Ngừng cấp'}</p>
                 <hr style="margin: 6px 0; border: none; border-top: 1px dashed #cbd5e1;">
                 <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
                   🧭 Chỉ đường tới tủ điện
@@ -1556,15 +1062,12 @@ export default {
             `);
           }
         });
-
         layers.push(cabinetsLayer);
       }
 
-      // 🌟 Đóng gói tất cả vào 1 FeatureGroup duy nhất
       leafletLayers.lightingSystem = L.featureGroup(layers);
     },
 
-    // 📍 VẼ CÁC VÙNG PHỤ CẬN LÂN CẬN (DÙNG CHÍNH CIRCLEMARKER ĐỂ KHÓA TỌA ĐỘ 100%)
     drawSurroundingLocations() {
       if (!this.surroundingLocationsData?.features?.length) return;
 
@@ -1578,7 +1081,6 @@ export default {
           const icon = p.icon || '📍';
           const name = p.name || p.code;
 
-          // 1. Tạo chấm tròn chuẩn toạ độ
           const marker = L.circleMarker(latlng, {
             pane: 'surroundingPane',
             interactive: true,
@@ -1590,16 +1092,14 @@ export default {
             fillOpacity: 1
           });
 
-          // 2. Nội dung nhãn
           const tooltipContent = `
             <div class="surrounding-tag" style="background-color: ${bgColor}; color: ${textColor}; border-color: ${bgColor};">
               <span>${icon} ${name}</span>
             </div>
           `;
 
-          // 3. Gắn Tooltip: 🌟 ÉP NẰM CHUNG PANE VỚI CIRCLEMARKER
           marker.bindTooltip(tooltipContent, {
-            pane: 'surroundingPane',  // 🌟 BẮT BUỘC: Đưa tooltip về chung một hệ quy chiếu với marker
+            pane: 'surroundingPane',
             permanent: true,
             direction: 'top',
             className: 'surrounding-leaflet-tooltip',
@@ -1636,6 +1136,270 @@ export default {
       }
     },
 
+    // =========================================================================
+    // 5. CÁC HÀM TIỆN ÍCH & ĐIỀU KHIỂN HIỂN THỊ
+    // =========================================================================
+    addPolygonLabel(feature, labelText, cssClass) {
+      if (!feature?.geometry || !labelText) return null;
+
+      try {
+        const pt = pointOnFeature(feature);
+        const [lng, lat] = pt.geometry.coordinates;
+
+        const labelMarker = L.circleMarker([lat, lng], {
+          interactive: false,
+          radius: 0,
+          opacity: 0,
+          fillOpacity: 0
+        }).addTo(this.map);
+
+        labelMarker.bindTooltip(labelText, {
+          permanent: true,
+          direction: 'center',
+          className: cssClass
+        });
+
+        if (cssClass === 'greenery-label') {
+          this.greeneryLabelMarkers.push(labelMarker);
+        } else if (cssClass === 'water-label') {
+          this.waterLabelMarkers.push(labelMarker);
+        }
+
+        return labelMarker;
+      } catch (error) {
+        console.warn('Không thể tính trọng tâm Polygon bằng Turf:', error);
+        return null;
+      }
+    },
+
+    checkAllLabelsVisibility() {
+      if (!this.map) return;
+      const currentZoom = this.map.getZoom();
+
+      const layersToCheck = [
+        { layer: this.roadsGeoJsonLayer, minZoom: 17, maxZoom: 20 },
+        { layer: this.plotsGeoJsonLayer, minZoom: 17, maxZoom: 18 },
+        { layer: this.companyLandsGeoJsonLayer, minZoom: 18, maxZoom: 20 },
+        { layer: this.factoriesGeoJsonLayer, minZoom: 18, maxZoom: 20 }
+      ];
+
+      layersToCheck.forEach(item => {
+        if (!item.layer) return;
+        const show = currentZoom >= item.minZoom && currentZoom < item.maxZoom;
+        item.layer.eachLayer(l => {
+          if (l.getTooltip()) {
+            if (show) l.openTooltip();
+            else l.closeTooltip();
+          }
+        });
+      });
+
+      const showLandscape = currentZoom >= 17;
+      [...this.greeneryLabelMarkers, ...this.waterLabelMarkers].forEach(marker => {
+        if (marker?.getTooltip()) {
+          if (showLandscape) marker.openTooltip();
+          else marker.closeTooltip();
+        }
+      });
+    },
+
+    handleLayerChange({ name, config }) {
+      if (this.userLayerVisibility[name] !== undefined) {
+        this.userLayerVisibility[name] = config.visible;
+      }
+
+      const layer = leafletLayers[name];
+      if (!layer) return;
+
+      const currentZoom = this.map.getZoom();
+
+      if (config.visible) {
+        if (name === 'surroundingLocations') {
+          const isInRange = currentZoom >= 14 && currentZoom < 16;
+          if (isInRange && !this.map.hasLayer(layer)) {
+            this.map.addLayer(layer);
+          }
+        } else {
+          const detailLayers = ['lightingSystem', 'wastewater', 'rainwater'];
+          if (!detailLayers.includes(name) || currentZoom >= 16) {
+            if (!this.map.hasLayer(layer)) {
+              this.map.addLayer(layer);
+            }
+          }
+
+          if (config.name === "greenery") {
+            this.greeneryLabelMarkers.forEach(marker => marker.openTooltip());
+          } else if (config.name === "waterBodies") {
+            this.waterLabelMarkers.forEach(marker => marker.openTooltip());
+          }
+        }
+      } else {
+        if (this.map.hasLayer(layer)) {
+          this.map.removeLayer(layer);
+        }
+        if (config.name === "greenery") {
+          this.greeneryLabelMarkers.forEach(marker => marker.closeTooltip());
+        } else if (config.name === "waterBodies") {
+          this.waterLabelMarkers.forEach(marker => marker.closeTooltip());
+        }
+        return;
+      }
+
+      layer.eachLayer((subLayer) => {
+        if (subLayer.setStyle) {
+          subLayer.setStyle({
+            fillOpacity: config.opacity,
+            opacity: config.opacity
+          });
+        }
+      });
+
+      this.bringManholesToFront();
+      this.checkAllLabelsVisibility();
+    },
+
+    checkDetailLayersVisibility() {
+      if (!this.map) return;
+      const currentZoom = this.map.getZoom();
+      const MIN_DETAIL_ZOOM = 16;
+
+      const detailLayerKeys = ['lightingSystem', 'wastewater', 'rainwater'];
+
+      detailLayerKeys.forEach((key) => {
+        const layer = leafletLayers[key];
+        const userWantsVisible = this.userLayerVisibility[key];
+        if (!layer) return;
+
+        if (userWantsVisible && currentZoom >= MIN_DETAIL_ZOOM) {
+          if (!this.map.hasLayer(layer)) this.map.addLayer(layer);
+        } else {
+          if (this.map.hasLayer(layer)) this.map.removeLayer(layer);
+        }
+      });
+
+      // Lớp phụ cận ngoài ranh giới KCN
+      const surroundingLayer = leafletLayers.surroundingLocations;
+      const userWantsSurrounding = this.userLayerVisibility.surroundingLocations ?? true;
+
+      if (surroundingLayer) {
+        const isInSurroundingZoomRange = currentZoom >= 14 && currentZoom < 16;
+        if (userWantsSurrounding && isInSurroundingZoomRange) {
+          if (!this.map.hasLayer(surroundingLayer)) this.map.addLayer(surroundingLayer);
+        } else {
+          if (this.map.hasLayer(surroundingLayer)) this.map.removeLayer(surroundingLayer);
+        }
+      }
+    },
+
+    getPolygonStyle(status, opacity = 0.6) {
+      const baseStyle = { fillOpacity: opacity, opacity: opacity, weight: 2 };
+      switch (status) {
+        case 'rented': return { ...baseStyle, color: '#dc3545', fillColor: '#dc3545' };
+        case 'available': return { ...baseStyle, color: '#28a745', fillColor: '#28a745' };
+        case 'under_construction': return { ...baseStyle, color: '#ffc107', fillColor: '#ffc107' };
+        default: return { ...baseStyle, color: '#6c757d', fillColor: '#6c757d' };
+      }
+    },
+
+    formatStatus(status) {
+      if (status === 'rented') return 'Đang hoạt động';
+      if (status === 'available') return 'Đang trống / Cần đầu tư';
+      return 'Đang xây dựng';
+    },
+
+    getCurrentLocation() {
+      if (!navigator.geolocation) {
+        alert("Trình duyệt không hỗ trợ tính năng định vị GPS.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          if (this.currentLocationMarker) {
+            this.map.removeLayer(this.currentLocationMarker);
+          }
+
+          this.currentLocationMarker = L.circleMarker([lat, lng], {
+            radius: 9,
+            fillColor: '#007bff',
+            color: '#ffffff',
+            weight: 3,
+            opacity: 1,
+            fillOpacity: 1
+          }).addTo(this.map);
+
+          this.currentLocationMarker.bindPopup("<b>📍 Vị trí hiện tại của bạn</b>").openPopup();
+          this.map.setView([lat, lng], 17);
+        },
+        (error) => {
+          switch (error.code) {
+            case error.PERMISSION_DENIED: alert("Chưa cấp quyền truy cập GPS."); break;
+            case error.POSITION_UNAVAILABLE: alert("Không thể xác định vị trí GPS."); break;
+            case error.TIMEOUT: alert("Thời gian định vị quá hạn."); break;
+            default: alert("Lỗi định vị không xác định."); break;
+          }
+        },
+        { enableHighAccuracy: true }
+      );
+    },
+
+    addMapLegend() {
+      const legend = L.control({ position: 'bottomleft' });
+
+      legend.onAdd = () => {
+        const div = L.DomUtil.create('div', 'custom-map-legend collapsed');
+        div.id = 'map-legend-box';
+
+        div.innerHTML = `
+          <div class="legend-header" id="legend-toggle-btn" title="Click để ẩn/hiện chú thích">
+            <div class="legend-header-title">
+              <span class="legend-header-icon">📌</span>
+              <span class="legend-title-text">CHÚ THÍCH BẢN ĐỒ</span>
+            </div>
+            <span class="legend-toggle-arrow">▲</span>
+          </div>
+
+          <div class="legend-content">
+            <div class="legend-group-title">QUY HOẠCH & XÂY DỰNG</div>
+            <div class="legend-item"><span class="legend-line boundary-line"></span><span class="legend-text">Ranh giới quy hoạch</span></div>
+            <div class="legend-item"><span class="legend-box" style="background-color: #b45309; opacity: 0.7; border: 1px solid #f55b02;"></span><span class="legend-text">Đất công nghiệp</span></div>
+            <div class="legend-item"><span class="legend-box" style="background-color: #e11d48; opacity: 0.7; border: 1px solid #be123c;"></span><span class="legend-text">Đất thương mại dịch vụ</span></div>
+            <div class="legend-item"><span class="legend-box" style="background-color: #003099; opacity: 0.6; border: 1.5px solid #003099;"></span><span class="legend-text">Đất doanh nghiệp thuê</span></div>
+
+            <div class="legend-group-title">GIAO THÔNG & CẢNH QUAN</div>
+            <div class="legend-item"><span class="legend-line road-line"></span><span class="legend-text">Đường nội bộ KCN</span></div>
+            <div class="legend-item"><span class="legend-box greenery-box"></span><span class="legend-text">Khuôn viên cây xanh</span></div>
+            <div class="legend-item"><span class="legend-box water-box"></span><span class="legend-text">Mặt nước / Kênh điều hòa</span></div>
+
+            <div class="legend-group-title">HỆ THỐNG THOÁT NƯỚC</div>
+            <div class="legend-item"><span class="legend-point rainwater-point"></span><span class="legend-line rain-pipe-line"></span><span class="legend-text">Cống & Hố ga nước mưa</span></div>
+            <div class="legend-item"><span class="legend-point wastewater-point"></span><span class="legend-line waste-pipe-line"></span><span class="legend-text">Cống & Hố ga nước thải</span></div>
+
+            <div class="legend-group-title">HỆ THỐNG CHIẾU SÁNG</div>
+            <div class="legend-item"><span class="legend-icon-mini">⚡</span><span class="legend-text">Tủ điện chiếu sáng</span></div>
+            <div class="legend-item"><span class="legend-point pole-point"></span><span class="legend-text">Cột đèn chiếu sáng LED</span></div>
+            <div class="legend-item"><span class="legend-line cable-line"></span><span class="legend-text">Tuyến cáp điện ngầm</span></div>
+          </div>
+        `;
+
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+
+        const toggleBtn = div.querySelector('#legend-toggle-btn');
+        L.DomEvent.on(toggleBtn, 'click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          div.classList.toggle('collapsed');
+        });
+
+        return div;
+      };
+
+      legend.addTo(this.map);
+    },
+
     getFlag(country) {
       const flags = {
         'Hàn Quốc': '🇰🇷',
@@ -1647,7 +1411,7 @@ export default {
       };
       return flags[country] || '🌐';
     },
-    
+
     formatNumber(val) {
       if (!val) return '0';
       return Number(val).toLocaleString('vi-VN');
@@ -1664,7 +1428,7 @@ export default {
 .webgis-page {
   display: flex;
   flex-direction: column;
-  height: 100dvh; /* Co giãn chuẩn theo thanh trình duyệt di động */
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -1681,8 +1445,8 @@ export default {
   flex: 1;
   height: 100%;
   width: 100%;
+  position: relative;
   z-index: 1;
-  display: relative;
 }
 
 /* Nút định vị ghim góc dưới bên phải */
@@ -1691,15 +1455,15 @@ export default {
   bottom: 98px;
   right: 24px;
   z-index: 1000;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
-  border-radius: 50%;        /* Bo tròn nút */
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
   transition: all 0.2s ease;
@@ -1707,21 +1471,18 @@ export default {
   outline: none;
 }
 
-/* Hiệu ứng rê chuột trên máy tính */
 .locate-btn:hover {
   background-color: #f8fafc;
   border-color: #94a3b8;
   transform: scale(1.08);
 }
 
-/* Hiệu ứng khi bấm/chạm */
 .locate-btn:active {
   transform: scale(0.94);
   background-color: #eff6ff;
   border-color: #2563eb;
 }
 
-/* Tối ưu riêng trên màn hình điện thoại */
 @media (max-width: 640px) {
   .locate-btn {
     bottom: 28px;
@@ -1732,13 +1493,12 @@ export default {
   }
 }
 
-/* KHUNG PANEL CHÍNH - TỰ ĐỘNG CHUYỂN DẠNG BOTTOM-SHEET TRÊN MOBILE */
-/* KHUNG PANEL CHÍNH */
+/* Panel thông tin chi tiết nhà xưởng */
 .factory-info-panel {
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 330px; /* Tăng nhẹ độ rộng để chữ to không bị tràn dòng */
+  width: 330px;
   max-width: calc(100vw - 32px);
   background: #ffffff;
   border-radius: 12px;
@@ -1747,11 +1507,10 @@ export default {
   overflow: hidden;
   font-family: inherit;
   border: 1px solid #e2e8f0;
-  font-size: 13px; /* 🌟 Tăng từ 11px lên 13px */
+  font-size: 13px;
   color: #334155;
 }
 
-/* HEADER */
 .panel-header {
   padding: 10px 14px;
   background: #f8fafc;
@@ -1770,7 +1529,7 @@ export default {
   gap: 6px;
 }
 .badge {
-  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1779,7 +1538,7 @@ export default {
 .badge.rented, .badge.active { background: #dcfce7; color: #15803d; }
 .badge.empty, .badge.vacant { background: #fee2e2; color: #b91c1c; }
 .badge-plot {
-  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1788,12 +1547,11 @@ export default {
 }
 .factory-code {
   margin: 0;
-  font-size: 14.5px; /* 🌟 Tăng từ 13px lên 14.5px */
+  font-size: 14.5px;
   font-weight: 800;
   color: #0f172a;
 }
 
-/* CỤM NÚT GÓC PHẢI */
 .header-actions {
   display: flex;
   align-items: center;
@@ -1808,7 +1566,7 @@ export default {
   border-radius: 6px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  font-size: 15px; /* 🌟 Tăng icon từ 13px lên 15px */
+  font-size: 15px;
   text-decoration: none;
   cursor: pointer;
   transition: transform 0.15s, background 0.15s;
@@ -1823,7 +1581,7 @@ export default {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  font-size: 13px; /* 🌟 Tăng từ 11px lên 13px */
+  font-size: 13px;
   cursor: pointer;
   color: #64748b;
   display: flex;
@@ -1832,7 +1590,6 @@ export default {
 }
 .close-btn:hover { background: #e2e8f0; color: #0f172a; }
 
-/* BODY */
 .panel-body {
   padding: 12px 14px;
   display: flex;
@@ -1842,7 +1599,6 @@ export default {
   overflow-y: auto;
 }
 
-/* KHỐI DOANH NGHIỆP */
 .company-block {
   display: flex;
   flex-direction: column;
@@ -1863,7 +1619,7 @@ export default {
 }
 .company-name {
   margin: 0;
-  font-size: 13.5px; /* 🌟 Tăng từ 12px lên 13.5px */
+  font-size: 13.5px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1.35;
@@ -1875,7 +1631,7 @@ export default {
   flex-wrap: wrap;
 }
 .tag {
-  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  font-size: 11px;
   padding: 2px 7px;
   border-radius: 4px;
   background: #f1f5f9;
@@ -1883,7 +1639,6 @@ export default {
 }
 .tag-country { background: #eff6ff; color: #1e40af; font-weight: 600; }
 
-/* LƯỚI THÔNG TIN CHI TIẾT */
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1902,19 +1657,18 @@ export default {
   grid-column: span 2;
 }
 .label {
-  font-size: 11px; /* 🌟 Tăng từ 9px lên 11px */
+  font-size: 11px;
   color: #64748b;
   font-weight: 600;
 }
 .value {
-  font-size: 12.5px; /* 🌟 Tăng từ 10.5px lên 12.5px */
+  font-size: 12.5px;
   color: #1e293b;
   font-weight: 600;
 }
 .text-highlight { color: #047857; font-weight: 800; }
 .font-mono { font-family: monospace; font-size: 12px; }
 
-/* LIÊN HỆ & GHI CHÚ */
 .contact-footer {
   display: flex;
   flex-direction: column;
@@ -1928,7 +1682,7 @@ export default {
   flex-wrap: wrap;
 }
 .contact-link {
-  font-size: 12px; /* 🌟 Tăng từ 10px lên 12px */
+  font-size: 12px;
   color: #2563eb;
   text-decoration: none;
   font-weight: 600;
@@ -1936,7 +1690,7 @@ export default {
 .contact-link:hover { text-decoration: underline; }
 .notes-text {
   margin: 0;
-  font-size: 11.5px; /* 🌟 Tăng từ 9.5px lên 11.5px */
+  font-size: 11.5px;
   color: #475569;
   line-height: 1.4;
   background: #fffbeb;
@@ -1945,7 +1699,6 @@ export default {
   border: 1px solid #fef3c7;
 }
 
-/* TỐI ƯU GIAO DIỆN DI ĐỘNG */
 @media (max-width: 640px) {
   .factory-info-panel {
     top: auto;
@@ -1962,7 +1715,7 @@ export default {
   }
 }
 
-/* STYLES CHO CÁC LOẠI NHÃN TRÊN BẢN ĐỒ */
+/* Các nhãn bản đồ Leaflet */
 :deep(.greenery-label) {
   background-color: rgba(255, 255, 255, 0.9) !important; color: #15803d !important;
   font-weight: 700 !important; font-size: 10px !important; padding: 2px 5px !important;
@@ -2017,31 +1770,20 @@ export default {
 </style>
 
 <style>
-/* 🌟 TOÀN BỘ CSS GLOBAL CHO CONTROL BẢN ĐỒ DƯỚI ĐÁY CÓ PADDING SAFE-AREA CHO IPHONE */
+/* CSS TOÀN CỤC CHO CÁC CONTROLS VÀ TOOLTIPS LEAFLET */
 .leaflet-bottom.leaflet-left {
   z-index: 999 !important;
-  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
   margin-left: 12px !important;
+  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 .leaflet-bottom.leaflet-right {
   z-index: 999 !important;
-  margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
   margin-right: 12px !important;
-}
-
-/* =============================================================================
- * BẢNG CHÚ THÍCH BẢN ĐỒ TỐI ƯU CHO CẢ DESKTOP & MOBILE (RESPONSIVE TOUCH)
- * ============================================================================= */
-
-/* Khung chứa Control góc dưới bên trái của Leaflet */
-.leaflet-bottom.leaflet-left {
-  z-index: 999 !important;
-  margin-left: 12px !important;
   margin-bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* Khung bảng chú thích tổng */
+/* Bảng chú thích bản đồ (Map Legend) */
 .custom-map-legend {
   background: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(10px) !important;
@@ -2058,7 +1800,6 @@ export default {
   box-sizing: border-box !important;
 }
 
-/* TRẠNG THÁI THU GỌN (MẶC ĐỊNH) */
 .custom-map-legend.collapsed {
   width: auto !important;
   border-radius: 24px !important;
@@ -2080,7 +1821,6 @@ export default {
   transform: rotate(180deg) !important;
 }
 
-/* THANH HEADER ĐIỀU KHIỂN TOGGLE (CHUẨN VÙNG CHẠM TOUCH 40PX) */
 .legend-header {
   display: flex !important;
   align-items: center !important;
@@ -2093,9 +1833,7 @@ export default {
   -webkit-tap-highlight-color: transparent !important;
 }
 
-.legend-header:active {
-  background: #f1f5f9 !important;
-}
+.legend-header:active { background: #f1f5f9 !important; }
 
 .legend-header-title {
   display: flex !important;
@@ -2103,11 +1841,7 @@ export default {
   gap: 7px !important;
 }
 
-.legend-header-icon {
-  font-size: 14px !important;
-  line-height: 1 !important;
-}
-
+.legend-header-icon { font-size: 14px !important; line-height: 1 !important; }
 .legend-title-text {
   font-size: 11px !important;
   font-weight: 800 !important;
@@ -2124,27 +1858,19 @@ export default {
   margin-left: 8px !important;
 }
 
-/* VÙNG DANH SÁCH MỤC KHI BUNG RA */
 .legend-content {
   padding: 10px 14px 14px 14px !important;
   max-height: 48vh !important;
   overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch !important; /* Cuộn quán tính mượt mà trên iOS */
+  -webkit-overflow-scrolling: touch !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 6px !important;
 }
 
-/* Thanh cuộn siêu mảnh tinh tế */
-.legend-content::-webkit-scrollbar {
-  width: 4px !important;
-}
-.legend-content::-webkit-scrollbar-thumb {
-  background: #cbd5e1 !important;
-  border-radius: 4px !important;
-}
+.legend-content::-webkit-scrollbar { width: 4px !important; }
+.legend-content::-webkit-scrollbar-thumb { background: #cbd5e1 !important; border-radius: 4px !important; }
 
-/* TIÊU ĐỀ TỪNG CỤM HẠ TẦNG */
 .legend-group-title {
   font-size: 9px !important;
   font-weight: 800 !important;
@@ -2156,12 +1882,8 @@ export default {
   border-bottom: 1px dashed #e2e8f0 !important;
   padding-bottom: 2px !important;
 }
+.legend-group-title:first-child { margin-top: 0 !important; }
 
-.legend-group-title:first-child {
-  margin-top: 0 !important;
-}
-
-/* DÒNG HIỂN THỊ TỪNG ĐỐI TƯỢNG */
 .legend-item {
   display: flex !important;
   align-items: center !important;
@@ -2171,115 +1893,51 @@ export default {
   color: #334155 !important;
   line-height: 1.3 !important;
 }
+.legend-text { white-space: nowrap !important; }
 
-.legend-text {
-  white-space: nowrap !important;
-}
+.legend-line { display: inline-block !important; width: 16px !important; height: 0 !important; flex-shrink: 0 !important; }
+.legend-box { display: inline-block !important; width: 12px !important; height: 10px !important; border-radius: 2px !important; flex-shrink: 0 !important; }
+.legend-point { border-radius: 50% !important; border: 1.5px solid #ffffff !important; box-shadow: 0 0 3px rgba(0, 0, 0, 0.35) !important; flex-shrink: 0 !important; }
+.legend-icon-mini { display: inline-flex !important; align-items: center !important; justify-content: center !important; width: 14px !important; font-size: 12px !important; flex-shrink: 0 !important; }
 
-/* ĐỊNH DẠNG HÌNH HỌC MÔ PHỎNG */
-.legend-line {
-  display: inline-block !important;
-  width: 16px !important;
-  height: 0 !important;
-  flex-shrink: 0 !important;
-}
-
-.legend-box {
-  display: inline-block !important;
-  width: 12px !important;
-  height: 10px !important;
-  border-radius: 2px !important;
-  flex-shrink: 0 !important;
-}
-
-.legend-point {
-  border-radius: 50% !important;
-  border: 1.5px solid #ffffff !important;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.35) !important;
-  flex-shrink: 0 !important;
-}
-
-.legend-icon-mini {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 14px !important;
-  font-size: 12px !important;
-  flex-shrink: 0 !important;
-}
-
-/* MÀU SẮC CHUẨN ĐỒNG BỘ VỚI CÁC LAYER POSTGIS */
+/* Ký hiệu màu sắc Legend */
 .boundary-line { border-top: 2.5px dashed #e11d48 !important; }
-.plot-box { background-color: #b45309 !important; opacity: 0.7 !important; border: 1px solid #f55b02 !important; }
-.factory-box { background-color: #dc3545 !important; opacity: 0.75 !important; border: 1px solid #b91c1c !important; }
 .road-line { border-top: 4px solid #FFE082 !important; }
 .greenery-box { background-color: #22c55e !important; opacity: 0.75 !important; border: 1px solid #15803d !important; }
 .water-box { background-color: #0284c7 !important; opacity: 0.75 !important; border: 1px solid #0369a1 !important; }
-
 .rainwater-point { width: 9px !important; height: 9px !important; background-color: #007bff !important; }
 .rain-pipe-line { border-top: 2.5px solid #0284c7 !important; }
 .wastewater-point { width: 9px !important; height: 9px !important; background-color: #800080 !important; }
 .waste-pipe-line { border-top: 2.5px solid #9333ea !important; }
-
 .pole-point { width: 8px !important; height: 8px !important; background-color: #eab308 !important; }
 .cable-line { border-top: 2.5px solid #f59e0b !important; }
 
-/* =============================================================================
- * TINH CHỈNH ĐẶC BIỆT CHO MÀN HÌNH ĐIỆN THOẠI DI ĐỘNG (< 768px)
- * ============================================================================= */
 @media (max-width: 768px) {
   .leaflet-bottom.leaflet-left {
     margin-left: 8px !important;
-    /* Tránh va chạm thanh thao tác đáy hoặc che quá sâu góc trái */
     margin-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
   }
-
-  /* Khi thu gọn trên di động: làm thành viên nhộng bo tròn nhỏ gọn */
-  .custom-map-legend.collapsed {
-    border-radius: 20px !important;
-  }
-
-  .custom-map-legend.collapsed .legend-header {
-    padding: 2px 5px !important;
-    min-height: 34px !important;
-  }
-
-  .custom-map-legend.collapsed .legend-title-text {
-    font-size: 10px !important;
-  }
-
-  /* Khi bung ra trên mobile: giới hạn chiều cao tối đa 38vh để chừa không gian xem map */
-  .custom-map-legend:not(.collapsed) {
-    width: 215px !important;
-    max-height: 40vh !important;
-  }
-
-  .legend-content {
-    max-height: 32vh !important;
-    padding: 8px 11px 12px 11px !important;
-    gap: 5px !important;
-  }
-
-  .legend-item {
-    font-size: 10.5px !important;
-    gap: 7px !important;
-  }
+  .custom-map-legend.collapsed { border-radius: 20px !important; }
+  .custom-map-legend.collapsed .legend-header { padding: 2px 5px !important; min-height: 34px !important; }
+  .custom-map-legend.collapsed .legend-title-text { font-size: 10px !important; }
+  .custom-map-legend:not(.collapsed) { width: 215px !important; max-height: 40vh !important; }
+  .legend-content { max-height: 32vh !important; padding: 8px 11px 12px 11px !important; gap: 5px !important; }
+  .legend-item { font-size: 10.5px !important; gap: 7px !important; }
 }
 
-/* BASEMAP CONTROL STYLING */
+/* BaseMap Control Styling */
 .leaflet-control-layers-base label {
   display: flex !important; align-items: center !important; gap: 6px !important;
   font-size: 12px !important; font-weight: 700 !important; color: #0f172a !important;
   cursor: pointer !important; padding: 3px 0 !important;
 }
-
 .leaflet-control-layers {
   border-radius: 8px !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
   border: 1px solid #cbd5e1 !important;
 }
 
-/* ICON TỦ ĐIỆN CHIẾU SÁNG */
+/* Icon Tủ điện chiếu sáng */
 .cabinet-icon-box {
   background-color: #d97706;
   color: #ffffff;
@@ -2296,24 +1954,26 @@ export default {
   cursor: pointer;
 }
 
-/* Giải phóng vùng đệm pane chiếu sáng để click xuyên qua khoảng trống */
+/* Giải phóng các Pane để chuột không bị chặn */
 .leaflet-lightingCablesPane-pane,
-.leaflet-lightingPointsPane-pane {
+.leaflet-lightingPointsPane-pane,
+.leaflet-pipesPane-pane,
+.leaflet-pane.leaflet-companyLandsPane-pane,
+.leaflet-pane.leaflet-roadsPane-pane {
   pointer-events: none !important;
 }
 
-/* Kích hoạt click trên chính nét vẽ cáp và hình tròn bóng đèn */
 .leaflet-lightingCablesPane-pane svg path,
 .leaflet-lightingPointsPane-pane svg path,
-.leaflet-lightingPointsPane-pane .leaflet-interactive {
+.leaflet-lightingPointsPane-pane .leaflet-interactive,
+.leaflet-pipesPane-pane svg path,
+.leaflet-pane.leaflet-companyLandsPane-pane svg path,
+.leaflet-pane.leaflet-roadsPane-pane svg path {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
 
-/* =============================================================================
- * CSS FIX TRÔI TOOLTIP: DÙNG CƠ CHẾ POSITION CỦA LEAFLET
- * ============================================================================= */
-
+/* Tooltip Vùng lân cận phụ cận */
 .leaflet-tooltip.surrounding-leaflet-tooltip {
   background: transparent !important;
   border: none !important;
@@ -2323,16 +1983,12 @@ export default {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
-
-/* Chóp tam giác trỏ xuống */
 .leaflet-tooltip-top.surrounding-leaflet-tooltip::before {
   border-top-color: inherit !important;
   border-width: 6px 5px 0 !important;
   bottom: -6px !important;
   margin-left: -5px !important;
 }
-
-/* Thân nhãn bong bóng: CHỈ DÙNG display inline-flex thông thường */
 .surrounding-tag {
   display: inline-flex;
   align-items: center;
@@ -2345,21 +2001,8 @@ export default {
   white-space: nowrap;
   user-select: none;
   line-height: 1.2;
-  /* ⚠️ TUYỆT ĐỐI KHÔNG để transform, position: absolute, margin âm ở đây */
 }
 
-/* Giải phóng vùng đệm pane đường cống để click xuyên qua khoảng trống */
-.leaflet-pipesPane-pane {
-  pointer-events: none !important;
-}
-
-/* Bắt sự kiện click chính xác trên nét vẽ cống */
-.leaflet-pipesPane-pane svg path {
-  pointer-events: auto !important;
-  cursor: pointer !important;
-}
-
-/* Nhãn hiển thị tên thửa đất doanh nghiệp */
 :deep(.company-land-label) {
   background-color: rgba(255, 255, 255, 0.92) !important;
   color: #0f172a !important;
@@ -2375,31 +2018,6 @@ export default {
   white-space: nowrap !important;
 }
 :deep(.company-land-label::before) { display: none !important; }
-
-/* 1. Giải phóng toàn bộ khung Pane của Đất doanh nghiệp để không che các lớp dưới */
-.leaflet-pane.leaflet-companyLandsPane-pane {
-  pointer-events: none !important;
-}
-
-/* 2. Bắt buộc kích hoạt sự kiện chuột LÊN ĐÚNG CÁC ĐA GIÁC (PATH) */
-.leaflet-pane.leaflet-companyLandsPane-pane svg path {
-  pointer-events: auto !important;
-  cursor: pointer !important;
-}
-
-/* 3. Cho phép click xuyên qua nhãn chữ của thửa đất */
-.company-land-label {
-  pointer-events: none !important;
-  user-select: none !important;
-}
-
-/* 4. Đảm bảo Pane mặt đường (roadsPane) không nuốt click */
-.leaflet-pane.leaflet-roadsPane-pane {
-  pointer-events: none !important;
-}
-.leaflet-pane.leaflet-roadsPane-pane svg path {
-  pointer-events: auto !important;
-}
 
 .leaflet-control-attribution {
   display: none !important;
