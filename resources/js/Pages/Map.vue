@@ -791,23 +791,67 @@ export default {
 
     // 🧪 VẼ HỆ THỐNG NƯỚC THẢI (GỒM CỐNG D400 + MŨI TÊN + HỐ GA)
     drawWastewater() {
-      const pipeRenderer = L.svg({ pane: 'pipesPane' });
-      const layers = [];
+      leafletLayers.wastewater = this.createDrainageSystemLayer({
+        pipeType: 'wastewater',
+        pipeTitle: '🧪 TUYẾN THU GOM NƯỚC THẢI',
+        pipeColor: '#9333ea',
+        arrowFillColor: '#581c87',
+        defaultMaterial: 'HDPE 2 vách',
 
-      // 1. TÁCH DỮ LIỆU ĐƯỜNG CỐNG NƯỚC THẢI
-      const wastePipes = {
+        manholesData: this.wastewaterManholesData,
+        manholeTitle: '🧪 Hố Ga Nước Thải',
+        manholeColor: '#800080',
+        manholeRadius: this.getPointRadiusInPixels(1.5, 2, 5.5),
+        extraFieldLabel: 'Độ sâu',
+        extraFieldKey: 'depth'
+      });
+    },
+
+    // 🌧️ VẼ HỆ THỐNG NƯỚC MƯA (GỒM CỐNG HỘP/D800 + MŨI TÊN + HỐ GA)
+    drawRainwater() {
+      leafletLayers.rainwater = this.createDrainageSystemLayer({
+        pipeType: 'rainwater',
+        pipeTitle: '🌧️ TUYẾN THOÁT NƯỚC MƯA',
+        pipeColor: '#0284c7',
+        arrowFillColor: '#0369a1',
+        defaultMaterial: 'BTCT',
+
+        manholesData: this.rainwaterManholesData,
+        manholeTitle: '🌧️ Hố Ga Nước Mưa',
+        manholeColor: '#007bff',
+        manholeRadius: this.getPointRadiusInPixels(1.3, 2, 5.0),
+        extraFieldLabel: 'Nắp',
+        extraFieldKey: 'cover_material'
+      });
+    },
+
+    /**
+     * 🌟 Hàm dùng chung khởi tạo toàn bộ Layer Hệ thống Thoát nước (Cống + Mũi tên + Hố ga)
+     * @param {Object} config Cấu hình màu sắc, dữ liệu và nhãn đặc thù của từng hệ thống
+     */
+    createDrainageSystemLayer(config) {
+      const layers = [];
+      const pipeRenderer = L.svg({ pane: 'pipesPane' });
+      const manholeRenderer = L.svg({ pane: 'pointsPane' });
+
+      // ----------------------------------------------------------------------
+      // 1. TÁCH DỮ LIỆU ĐƯỜNG CỐNG THEO TYPE
+      // ----------------------------------------------------------------------
+      const filteredPipes = {
         type: 'FeatureCollection',
-        features: (this.drainagePipesData?.features || []).filter(f => f.properties.pipe_type === 'wastewater')
+        features: (this.drainagePipesData?.features || []).filter(
+          (f) => f.properties.pipe_type === config.pipeType
+        )
       };
 
-      if (wastePipes.features.length) {
-        const pipeLayer = L.geoJSON(wastePipes, {
+      if (filteredPipes.features.length) {
+        const pipeLayer = L.geoJSON(filteredPipes, {
           pane: 'pipesPane',
           renderer: pipeRenderer,
           interactive: true,
           style: (feature) => ({
             pane: 'pipesPane',
-            color: '#9333ea', // Màu tím chuẩn nhận diện nước thải
+            color: config.pipeColor,
             weight: this.getPipeWeightInPixels(feature),
             opacity: 0.95,
             lineCap: 'round',
@@ -815,63 +859,109 @@ export default {
           }),
           onEachFeature: (feature, layer) => {
             const p = feature.properties;
-            const spec = p.cross_section === 'circular' ? `D${p.diameter || '---'} mm` : `Hộp ${p.width}x${p.height} mm`;
+            const spec = p.cross_section === 'circular'
+              ? `D${p.diameter || '---'} mm`
+              : `Hộp ${p.width}x${p.height} mm`;
+
             layer.bindPopup(`
-              <div style="font-size: 13px; min-width: 200px; font-family: sans-serif;">
-                <h4 style="margin: 0 0 6px 0; color: #9333ea;">🧪 TUYẾN THU GOM NƯỚC THẢI</h4>
+              <div style="font-size: 13px; min-width: 210px; font-family: sans-serif; line-height: 1.45;">
+                <h4 style="margin: 0 0 6px 0; color: ${config.pipeColor};">${config.pipeTitle}</h4>
                 <p style="margin: 3px 0;"><b>Mã cống:</b> <span style="color:#0284c7; font-weight:bold;">${p.code}</span></p>
                 <p style="margin: 3px 0;"><b>Tên đoạn:</b> ${p.name || '---'}</p>
-                <p style="margin: 3px 0;"><b>Quy cách:</b> ${spec} (${p.material || 'HDPE 2 vách'})</p>
-                <p style="margin: 3px 0;"><b>Dòng chảy:</b> ${p.start_manhole_code} ➔ ${p.end_manhole_code}</p>
+                <p style="margin: 3px 0;"><b>Quy cách:</b> ${spec} (${p.material || config.defaultMaterial})</p>
+                <p style="margin: 3px 0;"><b>Dòng chảy:</b> ${p.start_manhole_code || '---'} ➔ ${p.end_manhole_code || '---'}</p>
                 <p style="margin: 3px 0;"><b>Cốt đáy:</b> ${p.invert_start_elevation || '---'}m ➔ ${p.invert_end_elevation || '---'}m</p>
                 <p style="margin: 3px 0;"><b>Độ dốc i:</b> <b style="color:#059669;">${p.slope ? p.slope + '%' : '---'}</b></p>
                 <p style="margin: 3px 0;"><b>Chiều dài:</b> ${p.length_m ? p.length_m + ' m' : '---'}</p>
               </div>
             `);
+
             layer.on({
-              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 }); },
-              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 }); }
+              mouseover: (e) => {
+                e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 });
+              },
+              mouseout: (e) => {
+                e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 });
+              }
             });
           }
         });
 
         layers.push(pipeLayer);
 
-        // 2. VẼ MŨI TÊN DÒNG CHẢY NƯỚC THẢI
+        // --------------------------------------------------------------------
+        // 2. VẼ MŨI TÊN DÒNG CHẢY (TỰ ĐỘNG LỌC BỎ CÁC ĐOẠN NGẮN)
+        // --------------------------------------------------------------------
         if (typeof L.polylineDecorator === 'function') {
           const arrowDecors = [];
+
           pipeLayer.eachLayer((pLayer) => {
             if (pLayer instanceof L.Polyline) {
-              const arrow = L.polylineDecorator(pLayer, {
-                patterns: [{
-                  offset: '20px',
-                  repeat: '70px',
-                  symbol: L.Symbol.arrowHead({
-                    pixelSize: 8,
-                    polygon: true,
-                    pathOptions: {
-                      pane: 'pipesPane',
-                      fillColor: '#581c87',
-                      fillOpacity: 1,
-                      color: '#ffffff',
-                      weight: 1
-                    }
-                  })
-                }]
-              });
+              const latlngs = pLayer.getLatLngs();
+              // if (!latlngs || latlngs.length < 2) return;
+
+              // Ưu tiên chiều dài thực tế (m), nếu thiếu tự tính theo tọa độ
+              let lengthInMeters = pLayer.feature?.properties?.length_m;
+              if (!lengthInMeters) {
+                lengthInMeters = 0;
+                for (let i = 0; i < latlngs.length - 1; i++) {
+                  lengthInMeters += latlngs[i].distanceTo(latlngs[i + 1]);
+                }
+              }
+
+              // 🛑 Đoạn ngắn hơn 15m: Bỏ qua hoàn toàn, không vẽ mũi tên
+              if (lengthInMeters < 30) return;
+
+              // 📍 Đoạn từ 15m - 35m: Chỉ vẽ đúng 1 mũi tên tại tâm 50%
+              // 📍 Đoạn dài > 35m: Bắt đầu từ 25m và lặp cách nhau 55m
+              const patternConfig = lengthInMeters < 35
+                ? [{
+                    offset: '50%',
+                    repeat: 0,
+                    symbol: L.Symbol.arrowHead({
+                      pixelSize: 8,
+                      polygon: true,
+                      pathOptions: {
+                        pane: 'pipesPane',
+                        fillColor: config.arrowFillColor,
+                        fillOpacity: 1,
+                        color: '#ffffff',
+                        weight: 1
+                      }
+                    })
+                  }]
+                : [{
+                    offset: '25m',
+                    repeat: '55m',
+                    symbol: L.Symbol.arrowHead({
+                      pixelSize: 8,
+                      polygon: true,
+                      pathOptions: {
+                        pane: 'pipesPane',
+                        fillColor: config.arrowFillColor,
+                        fillOpacity: 1,
+                        color: '#ffffff',
+                        weight: 1
+                      }
+                    })
+                  }];
+
+              const arrow = L.polylineDecorator(pLayer, { patterns: patternConfig });
               arrowDecors.push(arrow);
             }
           });
+
           if (arrowDecors.length) {
             layers.push(L.featureGroup(arrowDecors));
           }
         }
       }
 
-      // 3. VẼ HỐ GA NƯỚC THẢI (Nổi lên trên pointsPane)
-      if (this.wastewaterManholesData?.features?.length) {
-        const manholeRenderer = L.svg({ pane: 'pointsPane' });
-        const manholeLayer = L.geoJSON(this.wastewaterManholesData, {
+      // ----------------------------------------------------------------------
+      // 3. VẼ HỐ GA (CircleMarker gắn chặt vào pointsPane)
+      // ----------------------------------------------------------------------
+      if (config.manholesData?.features?.length) {
+        const manholeLayer = L.geoJSON(config.manholesData, {
           pane: 'pointsPane',
           renderer: manholeRenderer,
           interactive: true,
@@ -880,8 +970,8 @@ export default {
               pane: 'pointsPane',
               renderer: manholeRenderer,
               interactive: true,
-              radius: this.getPointRadiusInPixels(1.5, 2, 5.5),
-              fillColor: '#800080',
+              radius: config.manholeRadius,
+              fillColor: config.manholeColor,
               color: '#ffffff',
               weight: 1.5,
               opacity: 0.9,
@@ -894,20 +984,22 @@ export default {
             const lng = layer.getLatLng().lng;
 
             layer.bindPopup(`
-              <div style="font-size: 13px; min-width: 180px;">
-                <b style="color: #800080;">🧪 Hố Ga Nước Thải</b><br>
-                <b>Mã:</b> ${props.code}<br>
+              <div style="font-size: 13px; min-width: 190px; font-family: sans-serif; line-height: 1.45;">
+                <b style="color: ${config.manholeColor};">${config.manholeTitle}</b><br>
+                <b>Mã:</b> <span style="font-family:monospace; font-weight:bold;">${props.code}</span><br>
                 <b>DN:</b> ${props.company_name || 'Chưa gắn'}<br>
-                <b>Độ sâu:</b> ${props.depth || 'N/A'} m<br>
+                <b>${config.extraFieldLabel}:</b> ${props[config.extraFieldKey] || 'N/A'}<br>
                 <hr style="margin: 6px 0; border: none; border-top: 1px dashed #ccc;">
                 <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
                   🧭 Chỉ đường (Google Maps)
                 </a>
               </div>
             `);
+
             layer.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
             });
+
             layer.on({
               mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
               mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
@@ -918,141 +1010,7 @@ export default {
         layers.push(manholeLayer);
       }
 
-      // Gộp chung toàn bộ thành 1 FeatureGroup
-      leafletLayers.wastewater = L.featureGroup(layers);
-    },
-
-    // 🌧️ VẼ HỆ THỐNG NƯỚC MƯA (GỒM CỐNG HỘP/D800 + MŨI TÊN + HỐ GA)
-    drawRainwater() {
-      const pipeRenderer = L.svg({ pane: 'pipesPane' });
-      const layers = [];
-
-      // 1. TÁCH DỮ LIỆU ĐƯỜNG CỐNG NƯỚC MƯA
-      const rainPipes = {
-        type: 'FeatureCollection',
-        features: (this.drainagePipesData?.features || []).filter(f => f.properties.pipe_type === 'rainwater')
-      };
-
-      if (rainPipes.features.length) {
-        const pipeLayer = L.geoJSON(rainPipes, {
-          pane: 'pipesPane',
-          renderer: pipeRenderer,
-          interactive: true,
-          style: (feature) => ({
-            pane: 'pipesPane',
-            color: '#0284c7', // Màu xanh lam nhận diện nước mưa
-            weight: this.getPipeWeightInPixels(feature),
-            opacity: 0.95,
-            lineCap: 'round',
-            lineJoin: 'round'
-          }),
-          onEachFeature: (feature, layer) => {
-            const p = feature.properties;
-            const spec = p.cross_section === 'circular' ? `D${p.diameter || '---'} mm` : `Hộp ${p.width}x${p.height} mm`;
-            layer.bindPopup(`
-              <div style="font-size: 13px; min-width: 200px; font-family: sans-serif;">
-                <h4 style="margin: 0 0 6px 0; color: #0284c7;">🌧️ TUYẾN THOÁT NƯỚC MƯA</h4>
-                <p style="margin: 3px 0;"><b>Mã cống:</b> <span style="color:#0284c7; font-weight:bold;">${p.code}</span></p>
-                <p style="margin: 3px 0;"><b>Tên đoạn:</b> ${p.name || '---'}</p>
-                <p style="margin: 3px 0;"><b>Quy cách:</b> ${spec} (${p.material || 'BTCT'})</p>
-                <p style="margin: 3px 0;"><b>Dòng chảy:</b> ${p.start_manhole_code} ➔ ${p.end_manhole_code}</p>
-                <p style="margin: 3px 0;"><b>Cốt đáy:</b> ${p.invert_start_elevation || '---'}m ➔ ${p.invert_end_elevation || '---'}m</p>
-                <p style="margin: 3px 0;"><b>Độ dốc i:</b> <b style="color:#059669;">${p.slope ? p.slope + '%' : '---'}</b></p>
-                <p style="margin: 3px 0;"><b>Chiều dài:</b> ${p.length_m ? p.length_m + ' m' : '---'}</p>
-              </div>
-            `);
-            layer.on({
-              mouseover: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 4 }); },
-              mouseout: (e) => { e.target.setStyle({ weight: this.getPipeWeightInPixels(feature) + 1 }); }
-            });
-          }
-        });
-
-        layers.push(pipeLayer);
-
-        // 2. VẼ MŨI TÊN DÒNG CHẢY NƯỚC MƯA
-        if (typeof L.polylineDecorator === 'function') {
-          const arrowDecors = [];
-          pipeLayer.eachLayer((pLayer) => {
-            if (pLayer instanceof L.Polyline) {
-              const arrow = L.polylineDecorator(pLayer, {
-                patterns: [{
-                  offset: '20px',
-                  repeat: '70px',
-                  symbol: L.Symbol.arrowHead({
-                    pixelSize: 8,
-                    polygon: true,
-                    pathOptions: {
-                      pane: 'pipesPane',
-                      fillColor: '#0369a1',
-                      fillOpacity: 1,
-                      color: '#ffffff',
-                      weight: 1
-                    }
-                  })
-                }]
-              });
-              arrowDecors.push(arrow);
-            }
-          });
-          if (arrowDecors.length) {
-            layers.push(L.featureGroup(arrowDecors));
-          }
-        }
-      }
-
-      // 3. VẼ HỐ GA NƯỚC MƯA (Nổi lên trên pointsPane)
-      if (this.rainwaterManholesData?.features?.length) {
-        const rainManholeRenderer = L.svg({ pane: 'pointsPane' });
-        const manholeLayer = L.geoJSON(this.rainwaterManholesData, {
-          pane: 'pointsPane',
-          renderer: rainManholeRenderer,
-          interactive: true,
-          pointToLayer: (feature, latlng) => {
-            return L.circleMarker(latlng, {
-              pane: 'pointsPane',
-              renderer: rainManholeRenderer,
-              interactive: true,
-              radius: this.getPointRadiusInPixels(1.3, 2, 5.0),
-              fillColor: '#007bff',
-              color: '#ffffff',
-              weight: 1.5,
-              opacity: 0.9,
-              fillOpacity: 0.9
-            });
-          },
-          onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            const lat = layer.getLatLng().lat;
-            const lng = layer.getLatLng().lng;
-
-            layer.bindPopup(`
-              <div style="font-size: 13px; min-width: 180px;">
-                <b style="color: #007bff;">🌧️ Hố Ga Nước Mưa</b><br>
-                <b>Mã:</b> ${props.code}<br>
-                <b>DN:</b> ${props.company_name || 'Chưa gắn'}<br>
-                <b>Nắp:</b> ${props.cover_material || 'N/A'}<br>
-                <hr style="margin: 6px 0; border: none; border-top: 1px dashed #ccc;">
-                <a href="${this.getGoogleMapsUrl(lat, lng)}" target="_blank" class="directions-btn">
-                  🧭 Chỉ đường (Google Maps)
-                </a>
-              </div>
-            `);
-            layer.on('click', (e) => {
-              L.DomEvent.stopPropagation(e);
-            });
-            layer.on({
-              mouseover: (e) => { e.target.setStyle({ radius: 8, weight: 3 }); },
-              mouseout: (e) => { e.target.setStyle({ radius: 6, weight: 2 }); }
-            });
-          }
-        });
-
-        layers.push(manholeLayer);
-      }
-
-      // Gộp chung toàn bộ thành 1 FeatureGroup
-      leafletLayers.rainwater = L.featureGroup(layers);
+      return L.featureGroup(layers);
     },
 
     //  hàm tính độ dày đường cống
@@ -1724,6 +1682,54 @@ export default {
   height: 100%;
   width: 100%;
   z-index: 1;
+  display: relative;
+}
+
+/* Nút định vị ghim góc dưới bên phải */
+.locate-btn {
+  position: absolute;
+  bottom: 98px;
+  right: 24px;
+  z-index: 1000;
+  width: 30px;
+  height: 30px;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;        /* Bo tròn nút */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  transition: all 0.2s ease;
+  user-select: none;
+  outline: none;
+}
+
+/* Hiệu ứng rê chuột trên máy tính */
+.locate-btn:hover {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  transform: scale(1.08);
+}
+
+/* Hiệu ứng khi bấm/chạm */
+.locate-btn:active {
+  transform: scale(0.94);
+  background-color: #eff6ff;
+  border-color: #2563eb;
+}
+
+/* Tối ưu riêng trên màn hình điện thoại */
+@media (max-width: 640px) {
+  .locate-btn {
+    bottom: 28px;
+    right: 14px;
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+  }
 }
 
 /* KHUNG PANEL CHÍNH - TỰ ĐỘNG CHUYỂN DẠNG BOTTOM-SHEET TRÊN MOBILE */
