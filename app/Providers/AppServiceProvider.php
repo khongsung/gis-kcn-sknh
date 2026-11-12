@@ -30,8 +30,16 @@ class AppServiceProvider extends ServiceProvider
             return 'Database\\Factories\\' . class_basename($modelName) . 'Factory';
         });
 
-        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
-            URL::forceScheme('https');
+        // if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        //     URL::forceScheme('https');
+        // } elseif (config('app.env') === 'production') {
+        //     URL::forceScheme('https');
+        // }
+
+            // Chỉ ép HTTPS khi truy cập qua Cloudflare Tunnel / Reverse Proxy
+        if (request()->header('X-Forwarded-Proto') === 'https') {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
         }
+
     }
 }
